@@ -82,4 +82,4 @@ We'll discuss the details of floating point multiplication later, but one can im
 Overall, these metrics help us understand how efficiently the loop maps to hardware — whether operations are serialized or overlapped, and how well the design meets timing constraints.
 ---
 
-Go to [Optimizing the loop](./optim.md).
+Go to [Loop pipelining](./pipelining.md).
