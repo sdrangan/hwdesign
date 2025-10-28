@@ -42,6 +42,6 @@ Each directory has all the synthesis outputs for each unroll factor.
     ...
 ~~~
 Each of these files is an XML file with the synthesis results for the multiplcation loop.  
-* Go to the [jupyter notebook]({{site.root }}/fpgademos/vector_mult/vmult_vitis/scripts/synth_analysis.ipynb) to analyze the results.
+* Go to the [jupyter notebook](https://github.com/sdrangan/fpgademos/blob/main/vector_mult/vmult_vitis/scripts/synth_analysis.ipynb) to analyze the results.
 
 
