@@ -1,9 +1,10 @@
 ---
 title: Building the FPGA bitstream and PYNQ Overlay
 parent: Getting started
-nav_order: 3
+nav_order: 4
 has_children: false
 ---
+# Creating the FPGA Bitstream and PYNQ Overlay
 
 ## Creating the FPGA Bitstream in Vivado
 
@@ -58,13 +59,6 @@ Since this file collection is a pain, I created a script to this(actually, I got
 ~~~
 This should find all the files you need and place them in the overlay directory.
 
-## Connecting to the RFSoC
+---
 
-* Now follow the instructions on the [RFSoC-PYNQ getting started page](https://www.rfsoc-pynq.io/rfsoc_4x2_getting_started.html).
-You should be able to connect to the browser from the host PC at `http://192.168.3.1/lab`. 
-* Enter the password `xilinx`.
-* Create a directory `scalar_add_demo` with a subdirectory `overlay`.  In the future, I will make this so you can clone the git repo here and have the files on the FPGA board.
-* Upload the files in the `overlay` directory to the `overlay` directory on the FPGA board
-
-
-
+Go to [Accessing the IP from PYNQ](./pynq.md)

@@ -56,3 +56,6 @@ Alternatively, you could have selected `New Source File` and created the file he
 * Next in the `FLOW` panel, `Package->Run`.
 * The packaging will have created a directory of files containing the *IP* for the adder.  It will be located in `scalar_adder_vitis/scalar_add/add/hls/impl/ip`. 
 * Note that we do not need to run the `Implementation` step -- this is for creating standalone bitstreams, not ones that will be integrated into a larger FPGA project.
+
+---
+Go to [Adding the Vitis IP](./add_ip.md)
