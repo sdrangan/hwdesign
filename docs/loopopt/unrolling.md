@@ -4,10 +4,11 @@ parent: Loop optimization
 nav_order: 4
 has_children: false
 ---
+# Loop Unrolling
 
 ## What is loop unrolling?
 Now that we have discussed loop pipelining, we can get even more saving with *unrolling*.  
-Unrolling duplicates the loop body to perform multiple iterations in parallel.  For example, an unroll factor of 4 is like:
+Unrolling duplicates the loop body to perform multiple iterations in parallel.  For example, an unroll factor of 4 is equivalent to a loop like:
 ~~~C
 for (i=0; i < n; i += 4) {
     c_buf[i] = a_buf[i] * b_buf[i];
@@ -16,10 +17,10 @@ for (i=0; i < n; i += 4) {
     c_buf[i+3] = a_buf[i+3] * b_buf[i+3];
 }
 ~~~ 
-which means that there are four multiplies in each clock cycle.
-This unrolling is realized in hardware by instantiating up to four physical multiply units that run in parallel.  Ideally, this parallelism will reduce the latency by 4.
+where the four multiplies are performed simultaneously in each iteration.
+This unrolling is realized in hardware by instantiating up to four physical multiply units that run in parallel.  Ideally, this parallelism will reduce the latency by a factor of 4.
 
-In the above example, suppose `n=1024` and we unroll by a factor of 4.  We say `n=1024` is the *number of iterations* and the loop has 256 *trips* — each trip performs 4 multiplications in parallel due to unrolling."
+In the above example, suppose `n=1024` and we unroll by a factor of 4.  We say `n=1024` is the *number of iterations* and the loop has 256 *trips* — each trip performs 4 multiplications in parallel due to unrolling.
 
 
 In Vitis HLS, you do not need to manually unroll the loop.  You can simply add the pragma: 
