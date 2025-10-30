@@ -68,5 +68,5 @@ This is directory we will work on the most of project.
 
 ## Running the jupyter notebook
 * In the file panel of jupyter lab, you can open the notebook at `/fpgademos/scalar_adder/scalar_adder.ipynb`.
-* The notebook is also at the [github page](https://github.com/sdrangan/fpgademos/tree/main/scalar_adder/scalar_adder.ipynb)
+* The notebook is also at the [github page](https://github.com/sdrangan/fpgademos/tree/main/scalar_adder/notebooks/scalar_adder.ipynb)
 
