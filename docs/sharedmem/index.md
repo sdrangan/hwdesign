@@ -7,7 +7,7 @@ has_children: true
 
 # Shared Memory Interface to the Processor
 
-In the previous unit on [loop optimization]({site.root}/fpgademos/loopopt), we built and optimized a simple vector multiplier IP core.
+In the previous unit on [loop optimization](/fpgademos/loopopt/), we built and optimized a simple vector multiplier IP core.
 We will now interconnect this IP to the PS.   In this unit, we consider a simple interconnection method based on shared memory.  Specifically, you will learn to:
 
 * Add Vitis IP in a Vivado project that can read and write to external DDR memory

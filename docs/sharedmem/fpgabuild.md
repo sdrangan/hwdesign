@@ -43,7 +43,7 @@ We first create an Vivado project with the MPSOC:
    *  This will connect the `m_axi_gmem` on the Vitis IP to the `S_AXI_HP0_FPD` which connects the master AXI on the IP to the DDR controller on the PS.  Importantly, it may add a `AXI Smart connect` between the port to deal with address translation.  Stupidly, Vivado lets you directly connect  `m_axi_gmem` to `S_AXI_HP0_FPD` even if they are mis-matched.
 
 ## Creating the FPGA Bitstream and PYNQ Overlay
-Follow the similar steps in [Scalar adder demo]({{ site.baseurl }}/docs/scalar_adder/fpga_build.md) to create the bitstream and the PYNQ overlay.  If you want to skip this step, the overlay files are in `fpgademos/vector_mult/overlay/`.
+Follow the similar steps in [Scalar adder demo](/fpgademos/scalar_adder/fpga_build) to create the bitstream and the PYNQ overlay.  If you want to skip this step, the overlay files are in `fpgademos/vector_mult/overlay/`.
 
 
 

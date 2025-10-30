@@ -44,7 +44,7 @@ We address the data transfer into and out of IP cores in a later unit.  The data
 
 ## Building and Simulating the the Vector Multiplier
 
-The design files for this Vitis project are in the repo `fpgademos/vector_mult/vmult_vitis`.  Follow the instructions to [build the Vitis HLS project]]({{ site.baseurl }}/docs/vitis_build.md)) to build the project for these design files.  
+The design files for this Vitis project are in the repo `fpgademos/vector_mult/vmult_vitis`.  Follow the instructions to [build the Vitis HLS project]({{ site.baseurl }}/docs/vitis_build.md) to build the project for these design files.  
 The top of the file `include/vmult.h` provides a number of parameters that we can vary to see the effect of the optimization:
 ~~~C
 #define PIPELINE_EN 0  // Enables pipelining
