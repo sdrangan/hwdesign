@@ -1,4 +1,3 @@
-
 ---
 title: AXI memory transfers
 parent: Shared Memory PS Interface
