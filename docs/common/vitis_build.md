@@ -1,14 +1,14 @@
 ---
 title: Building a Vitis HLS project
 parent: Installation and Set-Up
-nav_order: 2
+nav_order: 3
 has_children: false
 ---
 
 # Building a Vitis HLS Project
 
 [Vitis HLS (High-Level Synthesis)](https://www.amd.com/en/products/software/adaptive-socs-and-fpgas/vitis/vitis-hls.html) is a tool from AMD that lets you design hardware accelerators using C, C++, or OpenCL, automatically converting your code into optimized RTL for FPGA implementation. It bridges the gap between software and hardware design, making it easier to prototype, analyze, and refine custom logic without writing Verilog or VHDL.
-In most of the demos in this class, we first build a Vitis IP core (IP = intellectual property) to perform some task, like matrix multiplication. We then integrate that IP into a larger FPGA design using a second tool, Vivado, also from AMD.
+In most of the demos in this class, we first build a Vitis IP core (IP = intellectual property) to perform some task, like matrix multiplication. We then integrate that IP into a larger FPGA designs in Vivado.
 
 In this note, we describe how we organize Vitis projects and show how to build them using Vitis HLS.
 

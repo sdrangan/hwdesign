@@ -20,7 +20,7 @@ In the previous unit on [loop optimization]({site.root}/fpgademos/loopopt), we b
 By default, it is set to `4`.
 * Run the script:
 ~~~bash
-vitis-run --mode hls --tcl scripts/buildip.tcl
+vitis-run --mode hls --tcl scripts/build_ip.tcl
 ~~~
 * Running the script will take about 1 to 2 minutes.
 * The IP should be located in a directory such as `/fpgademos/vector_mult/vmult_vitis/sol_uf4/` depending on what unroll factor you used.

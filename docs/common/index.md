@@ -7,6 +7,5 @@ has_children: true
 
 # Setting Up the System
 
-Some links to some tasks to help you get set up and configure the system (I will add more as needed):
+This directory provides tools for installing Vitis, Vivado and the basics for creating projects.
 
-* [Installing Vitis and Vivado](./installation.md)
