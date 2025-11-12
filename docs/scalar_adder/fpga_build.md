@@ -11,24 +11,24 @@ has_children: false
 We are now ready to create the bitstream to program the FPGA with the design.
 
 * Generate output products:
-   - In the `Block Design` window, open the `Sources` panel (left).
-   - Right-click `design_1.bd` and select `Generate Output Products...`.
+   - In the **Block Design** window, open the **Sources** panel (left).
+   - Right-click `design_1.bd` and select **Generate Output Products...**.
    - This step converts the Block Design (BD) into HDL netlists, making it usable for synthesis.
 * Create HDL wrapper:
    - The first time you generate output products, you need to generate the BD in a top-level module that Vivado can synthesize.  You only need to do this once.  If you later make chnages, you do not need to re-run this step.
-   - Right-click `design_1.bd` again and select `Create HDL Wrapper...`.
-   - Choose "Let Vivado manage wrapper and auto-update" (recommended).
+   - Right-click `design_1.bd` again and select **Create HDL Wrapper...** .
+   - Choose **Let Vivado manage wrapper and auto-update** (recommended).
 * Run Synthesis
    - In the **Flow Navigator** panel (left), click **Run Synthesis**.
    - This converts your HDL design into a *netlist*—a set of logic elements and their interconnections.
-   - You’ll see a pinwheel and the message `Running synthesis...` in the top right.
+   - You’ll see a pinwheel and the message *Running synthesis...* in the top right.
    - For simple designs, this finishes in under a minute. For larger ones, synthesis (and later steps) can take hours—so enjoy the speed while it lasts!
 * Run Implementation:
-   - Still in the `Flow Navigator`, click `Run Implementation`.
+   - Still in the **Flow Navigator**, click **Run Implementation**.
    - This step physically maps the synthesized logic onto the FPGA fabric.
    - Expect a few minutes of processing time.
 * Generate Bitstream
-   - Finally, click `Generate Bitstream` in the `Flow Navigator`.
+   - Finally, click **Generate Bitstream** in the `Flow Navigator`.
    - This creates the `.bit` file that programs the FPGA with your design.
 
 
@@ -37,10 +37,16 @@ We are now ready to create the bitstream to program the FPGA with the design.
 A **PYNQ overlay** is a packaged hardware design (bitstream + metadata) that can be loaded and controlled from Python on a PYNQ-enabled board (like ZCU111, ZCU104 or RFSoC). It abstracts the FPGA logic into a Python-friendly interface.  You can either create the overlay files manually or with a script.  
 Follow the following steps to create the PYNQ overlay manually.
 
-* Locate your bitstream and metadata file.  Vivado can place the files in crazy locations.  So, I suggest you go to the top directory and run the following command from the Vivado project directory for this demo:
+* Locate your bitstream and metadata file.  Vivado can place the files in crazy locations.  So, I suggest you go to the top directory and run the following command from the Vivado project directory for this demo.
+In Linux:
 ~~~bash
     find . -name *.bit
     find . -name *.hwh
+~~~
+Or, if you are using powershell:
+~~~powershell
+   Get-ChildItem -Recurse -Filter *.bit
+   Get-ChildItem -Recurse -Filter *.hwh
 ~~~
 You will locate files with names like:
     *  `scalar_adder_wrapper.bit` — the FPGA configuration file

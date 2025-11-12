@@ -7,5 +7,8 @@ has_children: true
 
 # Setting Up the System
 
-This directory provides tools for installing Vitis, Vivado and the basics for creating projects.
+This directory provides tools for:
+* Installing Vitis, Vivado
+* Basics for creating projects.
+* Setting up the FPGA hardware
 
