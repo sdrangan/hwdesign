@@ -43,7 +43,7 @@ In Linux:
     find . -name *.bit
     find . -name *.hwh
 ~~~
-Or, if you are using powershell:
+Or, if you are using Windows powershell:
 ~~~powershell
    Get-ChildItem -Recurse -Filter *.bit
    Get-ChildItem -Recurse -Filter *.hwh
