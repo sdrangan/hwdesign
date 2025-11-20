@@ -58,12 +58,14 @@ They are generally in two different directories.
 ## Creating the PYNQ files via a script
 Since this file collection is a pain, I created a script to this(actually, I got ChatGPT to write the script :) ) to perform this file collection.
 
-* Go to the project folder.  So, for the scalar adder project this is `/hwdesign/scaler_adder`
-* In this directory simply run:
+* Go to the project folder.  So, for the scalar adder project this is `/hwdesign/scaler_fun`
+* Activate the virtual environment for the `xilinxutils` package, if has not been activated.
+* In the project directory simply run:
 ~~~bash
-   bash ../common/collect_overlay_files.sh
+   python collect_overlay.py
 ~~~
 This should find all the files you need and place them in the overlay directory.
+* You can deactivate the virtual environment if needed.
 
 ---
 

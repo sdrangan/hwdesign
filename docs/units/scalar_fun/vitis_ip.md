@@ -65,20 +65,7 @@ match the expected results.
 So, it basically gives the IP two numbers and tests the result matches.
 Later, we will create more elaborate tests.
 
-## Simulate the Vitis IP
 
-We are now ready to test the code and build the IP.
-
-* In the **FLOW** panel (left sidebar), select **C Simulation → Run**.  It should run with a result of 35 and show `Test passed!`. This step simulates your C code to verify functional correctness before synthesis.
-* Still in the **FLOW** panel, select **C Synthesis → Run**.  
-  This step converts your C/C++ function into synthesizable RTL (Verilog/VHDL), targeting the specified FPGA part.
-* Next in the **FLOW** panel, select **Package → Run**.  
-  This wraps the synthesized RTL into a reusable IP block, complete with metadata and interface definitions.
-* The packaging will have created a directory of files containing the *IP* for the adder.  It will be located in 
-~~~bash
-  scalar_fun_vitis/scalar_fun/add/hls/impl/ip
-~~~
-* Note that we do not need to run the **Implementation** step — this is for creating standalone bitstreams, not ones that will be integrated into a larger FPGA project.
 
 ---
-Go to [Running an RTL simulation](./rtlsim.md)
+Go to [Simulate and synthesize the IP](./csynth.md)

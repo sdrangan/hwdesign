@@ -34,3 +34,4 @@ fallback_version = "0.1.0"
 
 [project.scripts]
 xsim_vcd = "xilinxutils.scripts.xsim_vcd:main"
+collect_overlay = "xilinxutils.scripts.collect_overlay:main"

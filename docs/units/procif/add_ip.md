@@ -6,14 +6,23 @@ has_children: false
 ---
 
 # Adding the Vitis IP to the FPGA Project
-We next create a Vivado project and add the IP.
 
-## Locating the IP folder
-After the IP has been synthesized, Vitis will create all the files for the IP in a folder with `impl/ip`.  You can locate this folder with a command like:
+In the [previous unit](../scalar_fun/), we designed, synthesized, and simulated a simple Vitis IP in isolation.  
+We next create a Vivado project and add the IP to that project.
+
+## Package the Vitis IP
+
+Before we can add the IP, we have to **package** the IP in a way that it can be used in the Vivado project.
+
+* [Luanch Vitis](../../setup/sw_installation/installation.md) and open the workspace for the `scalar_fun` project
+* In the **FLOW** panel (left sidebar), select select **Package → Run**.  
+  This wraps the synthesized RTL into a reusable IP block, complete with metadata and interface definitions.
+* The packaging will have created a directory of files containing the *IP* for the adder.  It will be located in 
 ~~~bash
-    find . -type d -path "*/impl/ip"
+  scalar_fun_vitis/scalar_fun/add/hls/impl/ip
 ~~~
-In the scalar adder case, this gets the directory  `./scalar_fun_vitis/add/hls/impl/ip`
+* Note that we do not need to run the **Implementation** step — this is for creating standalone bitstreams, not ones that will be integrated into a larger FPGA project.
+
 
 ## Create a Vivado Project and Add the IP
 

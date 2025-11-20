@@ -11,10 +11,10 @@ In this unit, we will build our first *accelerator*, a simple function on scalar
 
 By completing this demo, you will learn how to:
 
-* Design and synthesize a simple **Vitis IP** that performs a basic mathematical operation
-* Creating interfaces to the Vitis IP using an **AXI-Lite interface**
-* Simulate the synthesized Vitis IP and generate a **Value Change Dump** (VCD) file of the simulation outputs.
-* View the VCD interface traces on a **timing diagrams** 
+* Design, functionally simulate, and synthesize a simple **Vitis IP** that performs a basic mathematical operation
+* Create interfaces to the Vitis IP using an **AXI-Lite interface**
+* Perform an **RTL-level simulation** of the Vitis IP and generate a **Value Change Dump** (VCD) file of the simulation outputs.
+* View the VCD traces on a **timing diagrams** 
 
 
 ## Pre-Requirements
