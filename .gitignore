@@ -41,7 +41,8 @@ build/
 *.db
 *.pb
 **/dfx_runtime.txt
-**/compile_summary*
+*summary*
+*.rpt
 
 
 # General

@@ -1,12 +1,12 @@
 ---
 title: Addding the Vitis IP 
-parent: Scalar Function
-nav_order: 3
+parent: Basic Processor Interface
+nav_order: 1
 has_children: false
 ---
 
 # Adding the Vitis IP to the FPGA Project
-We next need to add the IP to the Vivado project. 
+We next create a Vivado project and add the IP.
 
 ## Locating the IP folder
 After the IP has been synthesized, Vitis will create all the files for the IP in a folder with `impl/ip`.  You can locate this folder with a command like:
@@ -15,9 +15,9 @@ After the IP has been synthesized, Vitis will create all the files for the IP in
 ~~~
 In the scalar adder case, this gets the directory  `./scalar_fun_vitis/add/hls/impl/ip`
 
-## Adding the Vitis IP to Vivado
+## Create a Vivado Project and Add the IP
 
-
+* Follow the instructions to [build an Vivado project](../../setup/sw_installation/vivado_build.md) with a processing system.
 * Go to **Tools->Settings->Project Settings->IP->Repository**.  Select the `+` sign in **IP Repositories**.  Navigate to the directory with the adder component.  In our case, this was at:  `hwdesign/scalar_fun/scalar_fun_vitis/add/hls/impl/ip`.  
 * Select the `Add IP` button (`+`) again.  Add this IP.  Now the `Add` block should show up as an option.  If it doesn't it is possible that you synthesized for the wrong FPGA part number.  
 * You should see an Vitis IP block with ports `s_axi_control`, `interrupt` and some clocks.  Select the **run block automation**.  This will connect the IP to the processing system and may add some additional blocks for resetting the processor and interfacing the IP with the processor.  

@@ -1,7 +1,7 @@
 ---
 title: Building the FPGA bitstream and PYNQ Overlay
-parent: Scalar Function
-nav_order: 4
+parent: Basic Processor Interface
+nav_order: 2
 has_children: false
 ---
 # Creating the FPGA Bitstream and PYNQ Overlay

@@ -1,6 +1,6 @@
 ---
 title: Creating the Vitis IP
-parent: Scalar Function
+parent: Simple Scalar Accelerator
 nav_order: 1
 has_children: false
 ---
@@ -11,12 +11,12 @@ and export the IP so that we can use it in Vivado.
 
 ## Creating the Vitis HLS Project
 
-* [Launch Vitis](../sw_installation/installation.md)
+* [Launch Vitis](../../setup/sw_installation/)
 * Select **Open Workspace**.  Go to the directory `hwdesign\scalar_fun`.  This is where we will put the workspace.  `Vitis_HLS` will reopen.
 * Select **Create component->Create empty HLS component**.  You will walk through the following six steps:
     * For **Name and location**, select component name as `hls_component` and the location as `hwdesign\scalar_fun\scalar_fun_vitis`
     * Set the **Configuration file** select **Empty File** which is the default
-    * In **Source Files**, select top function to `add`
+    * In **Source Files**, select top function to `simp_fun`
     * In the **Hardware** tab, you will need to select the hardware you are targetting.  Follow the instructions for [building the Vivado project](../sw_installation/vivado_build.md) to get the part number.  Select **Part** and search for the FGPA part number from above.
     * In the **Settings** tab, I kept all defaults, except I set the clock speed to either `250MHz` or `300MHz`.
 * Now you should have an empty project.
@@ -65,7 +65,7 @@ match the expected results.
 So, it basically gives the IP two numbers and tests the result matches.
 Later, we will create more elaborate tests.
 
-## Synthesizing and Building the Vitis IP
+## Simulate the Vitis IP
 
 We are now ready to test the code and build the IP.
 
@@ -81,4 +81,4 @@ We are now ready to test the code and build the IP.
 * Note that we do not need to run the **Implementation** step — this is for creating standalone bitstreams, not ones that will be integrated into a larger FPGA project.
 
 ---
-Go to [Adding the Vitis IP](./add_ip.md)
+Go to [Running an RTL simulation](./rtlsim.md)

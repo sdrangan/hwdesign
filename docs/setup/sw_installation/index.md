@@ -1,6 +1,6 @@
 ---
 title: Software Set-Up
-parent: Hardware Design
+parent: Hardware and software Set-up
 nav_order: 1
 has_children: true
 ---

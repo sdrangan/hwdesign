@@ -1,7 +1,7 @@
 ---
 title: Loop optimization
-parent: Hardware Design
-nav_order: 4
+parent: Course Units
+nav_order: 3
 has_children: true
 ---
 

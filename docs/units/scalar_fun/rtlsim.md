@@ -1,7 +1,7 @@
 ---
 title: Simulating the RTL
-parent: Scalar Function
-nav_order: 2
+parent: Simple Scalar Accelerator
+nav_order: 3
 has_children: false
 ---
 
@@ -11,7 +11,7 @@ Before adding the Vitis IP to the FPGA project, it is useful to simulate the syn
 This step can be done after C Synthesis, but before Packaging.
 
 * If Vitis is not already open from the previous step:
-    * [Launch Vitis](../sw_installation/installation.md)
+    * [Launch Vitis](../../setup/sw_installation/)
     * Open the workspace for the for the Vitis IP that you were using, which should be in `hwdesign/scalar_fun/scalar_fun_vitis`
 * In the **Flow panel** (left sidebar), find the **C/RTL Simulation** section
 * Select the settings (gear box) in the C/RTL Simulation:
@@ -44,9 +44,13 @@ where `vcdfile` is the name of the VCD file with the signal traces.  By default,
     scalar_fun_vitis\vcd\<vcd_file>
 ~~~
 
-## Extracting the VCD Files Manually 
+## Viewing the Timing Diagram
+After you have created VCD file, you can see the timing diagram from the [jupyter notebook](https://github.com/sdrangan/hwdesign/tree/main/scalar_fun/notebooks/view_timing.ipynb).
 
-You do not have to do this gory step, but if want to know how the python script above does, you can following these steps:
+## Understanding the `sxim_vcd.py` function. 
+
+Instead of using the `xsim_vcd.py` function, you can manually modify the simulation to generate the VCD files with the following steps.
+Basically, the `xsim_vcd.py` does these steps automatically.
 
 * After running the initial simulation, locate the directory where the simulation files are.
 For the scalar adder simulation, it will be in something like:
@@ -90,6 +94,5 @@ That is, we add a `cd /d` command to make the file callable from a different dir
 ~~~
 This will re-run the simulation and create a `dump.vcd` file of the simulation data.
 
-## Viewing the Timing Diagram
-After you have created VCD file, you can see the timing diagram from the [jupyter notebook](https://github.com/sdrangan/hwdesign/tree/main/scalar_fun/notebooks/view_timing.ipynb).
+
 
