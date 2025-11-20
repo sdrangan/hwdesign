@@ -305,6 +305,10 @@ class VcdViewer(object):
                 draw_top = True
                 draw_bot = True
                 draw_text = True
+                fill_gray = False
+                if (v in {'x', 'X', 'z', 'Z'}):
+                    draw_text = False
+                    fill_gray = True
                 if (si.two_level):
                     if v == '1':
                         draw_bot = False
@@ -321,6 +325,10 @@ class VcdViewer(object):
                     ax.hlines(ybot, t_start, t_end, color='black', linewidth=1)
                 if draw_top:
                     ax.hlines(ytop, t_start, t_end, color='black', linewidth=1)
+
+                # Fill gray for unknown values
+                if fill_gray:
+                    ax.fill_betweenx([ybot, ytop], t_start, t_end, color='lightgray')
 
                 # Place text label in the middle of the segment
                 if draw_text:

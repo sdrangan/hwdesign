@@ -31,3 +31,6 @@ include = ["xilinxutils*"]
 
 [tool.setuptools_scm]
 fallback_version = "0.1.0"
+
+[project.scripts]
+xsim_vcd = "xilinxutils.scripts.xsim_vcd:main"

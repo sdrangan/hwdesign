@@ -40,6 +40,9 @@ build/
 .vscode/
 *.db
 *.pb
+**/dfx_runtime.txt
+**/compile_summary*
+
 
 # General
 *.backup
