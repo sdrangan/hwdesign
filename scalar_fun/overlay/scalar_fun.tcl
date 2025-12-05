@@ -107,6 +107,7 @@ set rc [catch {
   create_msg_db write_bitstream.pb
   set_param chipscope.maxJobs 4
   set_param general.usePosixSpawnForFork 1
+  set_param bd.open.in_stealth_mode 1
   set_param runs.launchOptions { -jobs 8  }
   open_checkpoint design_1_wrapper_routed.dcp
   set_property webtalk.parent_dir C:/Users/sdran/Documents/repos/hwdesign/scalar_fun/scalar_fun_pynqz2/scalar_fun_pynqz2.cache/wt [current_project]

@@ -10,6 +10,7 @@ If the FPGA board (e.g., RFSoC or PYNQ) is connected directly to the host, it ma
 However, the board can obtain IP access through the IP access on your host machine.  
 You’ll bridge your Windows Wi-Fi (or other internet-connected interface) to the Ethernet interface connected to the FPGA board. Thoe host will act as a NAT gateway.
 
+
 ## Setting a Windows Host
 
 * Open **Control Panel->Network and Internet->Network Connections**
@@ -39,7 +40,14 @@ from which we can see the IP address of the Ethernet interface.  For the instruc
 ~~~
 Look for IP addresses in the same subnet as the IP address of the Ethernet interface, in our example, `192.168.137.x`.
 Try pinging those IPs to see which one has connectivity.  For example, it could be `192.168.137.139`
-* You should now be able to reconnect the browser to the `http://192.168.137.139:9090/lab`
+* There is a possibility that you do not see any IP addresses when you run `arp -a`.  In this case, you will need to find the IP address as follows:
+    * Log into via the USB serial interface (see below)
+    * Run
+~~~bash
+     ip addr show eth0
+~~~
+    * Look for an IP address in the same subnet as the `<host_ip_addr>`.  For example, in our example, this could be `192.168.137.x`.
+* You should now be able to reconnect the browser to the `http://192.168.137.139:9090/lab` or whatever the IP address of the Pynq board is
 * For Windows host, the FPGA board should automatically acquire a gateway and DNS server.  You can test as follows:
     * Open a terminal on the FPGA board (e.g., via Jupyter lab)
     * Try `ping 8.8.8.8` meaning the gateway is set up
@@ -82,3 +90,41 @@ So, in our example with the Windows host:
     sudo bash -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
 ~~~
 * Test `ping www.google.com` to make sure you have connectivity.
+
+## Connecting via the USB port
+
+When all connectivity is lost, your lifeline to the FPGA board may be the serial USB connection.
+This USB option is available on the Pynq-Z2 and the RFSoC 2x2.  To connect to the board via serial connection:
+
+* Find the port (e.g., COM4) corresponding to the USB connection to the FPGA board
+   * On Windows:  Go to **Device Manager->Ports**.  
+        * You should see something like *USB Serial Port (COM4)*, *USB‑UART Bridge (COM3)* or *Silicon Labs CP210x USB to UART Bridge (COMx)* 
+        * The number `COMx` is the number you want.
+    * On Linux: 
+        * Run
+        ~~~bash
+            dmesg | grep ttyUSB
+        ~~~
+        or
+        ~~~bash
+            ls /dev/ttyUSB*
+        ~~~
+        * You’ll typically see `/dev/ttyUSB0` (sometimes `/dev/ttyUSB1` if multiple devices are connected).
+        * That device path is what you’ll use in your serial terminal.
+
+* Open a serial terminal application.
+    * On Windows, you can install [Putty](https://putty.org/index.html)
+    * On Linux, you can use `minicom`, `screen`, or `picocom`.
+        * Example with `screen`:
+        ~~~bash
+            screen /dev/ttyUSB0 115200
+        ~~~ 
+
+* Open a session.  Select **Serial** session and set **Speed (baud)** to `115200`.
+    * Note that if you do not set the baud rate correctly, the connection witll not work.  This baud rate seems to work with Pynq-Z2.
+    Other FPGA boards may have other baud rates.  Sorry
+* You should be able to log in.  Default credentials for Pynq boards:
+    - Username: `xilinx`
+    - Password: `xilinx`.
+
+

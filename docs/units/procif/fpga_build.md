@@ -32,10 +32,26 @@ We are now ready to create the bitstream to program the FPGA with the design.
    - This creates the `.bit` file that programs the FPGA with your design.
 
 
+## Creating the PYNQ files via a script
+
+A **PYNQ overlay** is a packaged hardware design (bitstream + metadata) that can be loaded and controlled from Python on a PYNQ-enabled board (like ZCU111, ZCU104 or RFSoC). It abstracts the FPGA logic into a Python-friendly interface.  You can either create the overlay files manually or with a script. 
+The **generate bitstream** command above creates the files that we need for the overlay.  Before continuing, it is useful to bring them to a single location.
+To this end, I created a script to this (actually, I got ChatGPT to write the script :) ) to perform this file collection:
+
+* Go to the project folder.  So, for the scalar adder project this is `/hwdesign/scaler_fun`
+* Activate the virtual environment for the `xilinxutils` package, if has not been activated.
+* In the project directory simply run:
+~~~bash
+   collect_overlay
+~~~
+This should find all the files you need and place them in the overlay directory.
+* You can deactivate the virtual environment if needed.
+
+
 ## Creating a PYNQ Overlay files manually
 
-A **PYNQ overlay** is a packaged hardware design (bitstream + metadata) that can be loaded and controlled from Python on a PYNQ-enabled board (like ZCU111, ZCU104 or RFSoC). It abstracts the FPGA logic into a Python-friendly interface.  You can either create the overlay files manually or with a script.  
-Follow the following steps to create the PYNQ overlay manually.
+ 
+Instead of using the script, you can also collect the files yourself manually.  I document these steps simply to explain how I wrote the script.  But, you can skip this step if the automated script in the previous part worked.
 
 * Locate your bitstream and metadata file.  Vivado can place the files in crazy locations.  So, I suggest you go to the top directory and run the following command from the Vivado project directory for this demo.
 In Linux:
@@ -55,17 +71,6 @@ They are generally in two different directories.
 *  In the same directory as the `.bit` file, find the TCL file, like `scalar_fun_wrapper.tcl`. This file is useful for scripting.  For some reason, there may be multiple `tcl` files in the Vivado project directory.  Take the one in the same directory as the `.bit` file.
 * Copy all the files to the `overlay` directory and rename them as:  `scalar_fun.bit`, `scalar_fun.hwh`, `scalar_fun.tcl`.
 
-## Creating the PYNQ files via a script
-Since this file collection is a pain, I created a script to this(actually, I got ChatGPT to write the script :) ) to perform this file collection.
-
-* Go to the project folder.  So, for the scalar adder project this is `/hwdesign/scaler_fun`
-* Activate the virtual environment for the `xilinxutils` package, if has not been activated.
-* In the project directory simply run:
-~~~bash
-   python collect_overlay.py
-~~~
-This should find all the files you need and place them in the overlay directory.
-* You can deactivate the virtual environment if needed.
 
 ---
 
