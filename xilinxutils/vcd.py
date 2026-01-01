@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from vcdvcd import VCDVCD
 
+from xilinxutils.timing import SigTimingInfo
+
 class SigInfo(object):
     """
     Class to hold information about a VCD signal.
@@ -92,6 +94,11 @@ class SigInfo(object):
 
         Right now, `float` is not implemented.
         """
+
+        # Return if already computed
+        if self.disp_values is not None and self.numeric_values is not None:
+            return
+
         self.disp_values = []
         self.numeric_values = []
         for v in self.values:
@@ -108,9 +115,9 @@ class SigInfo(object):
     
 
 
-class VcdViewer(object):
+class VcdParser(object):
     """
-    Class to view VCD signals and plot timing diagrams.
+    Class to parse VCD signals and extract information.
 
     Attributes
     ----------
@@ -148,7 +155,7 @@ class VcdViewer(object):
 
     def add_saxi_signals(self):
         """ 
-        Adds the s_axi_control signals to disp_signals. 
+        Adds the s_axi_control signals to the signal list
         """
         prefix = 's_axi_control'
         for s in self.vcd.signals:
@@ -293,214 +300,46 @@ class VcdViewer(object):
         for s, si in self.sig_info.items():
             si.get_values()
 
-    
-    
-    def plot_signals(
-            self,
-            short_names = None,
-            add_clk_grid = True,
-            ax = None,
-            fig_width = 10,
-            row_height = 0.5,
-            row_step = 0.8,
-            left_border = None,
-            right_border = None,
-            trange = None,
-            text_scale_factor = 1000):
+    def get_td_signals(
+            self) -> dict[str, SigTimingInfo]:
         """
-        Plots the timing diagram for the selected signals.
+        Returns the information for all added signals so that this can be 
+        used for the timing diagram plotting.
 
-        Parameters
-        ----------
-        short_names : list of str, optional
-            List of short names of signals to plot. If None, plots all signals.
-        add_clk_grid : bool, optional
-            If True, adds vertical grid lines at clock edges. 
-        ax : matplotlib.axes.Axes, optional
-            Axes object to plot on. If None, a new figure and axes are created.
-        fig_width : float, optional
-            Width of the figure in inches (if ax is None).
-        row_height : float, optional    
-            Height of each row in inches.  
-        row_step : float, optional
-            Vertical spacing between rows.
-        left_border : float, optional
-            Left border space in time units. If None, set to 10% of time range.
-        right_border : float, optional
-            Right border space in time units. If None, set to 5% of time range.
-        trange : tuple(float, float), optional
-            Time range (tmin, tmax) to plot. If None, uses full range of signals.
-        text_scale_factor : float, optional
-            Scale factor to determine if there is enough space to draw text labels.
-
-        Returns 
+        Example
         -------
-        None         
-        ax : matplotlib.axes.Axes
-            Axes object with the plotted signals.   
+        from vcd import VcdParser
+        from timing import TimingDiagram
+
+        vp = VcdParser(vcd)
+        vp.add_signal(...)  # Add all signals to be plotted
+        ...
+        sig_list = vp.get_td_signals()
+        td = TimingDiagram()
+        td.add_signals(sig_list)
+        td.plot()
+        
+
+        Returns
+        -------
+        sig_list : list[SigTimingInfo]
+            List of signal timing information.
         """
 
-        # Determine signals to plot
-        if short_names is None:
-            signals_to_plot = list(self.sig_info.keys())    
-        else:
-            sig_found = {sn: False for sn in short_names}
-            signals_to_plot = []
-            for s, si in self.sig_info.items():
-                if si.short_name in short_names:
-                    sn = si.short_name  
-                    sig_found[sn] = True
-                    signals_to_plot.append(s)
-            for sn, found in sig_found.items():
-                if not found:
-                    print(f"Warning: Signal with short name '{sn}' not found.")
+        self.get_values()
 
-        
+        sig_list = []
+        for si in self.sig_info.values():
+            td_si = SigTimingInfo(
+                name = si.short_name,
+                times = si.times,
+                values = si.disp_values,
+                is_clock = si.is_clock)
+            sig_list.append(td_si)
+        return sig_list
+
     
-        # Create figure and axis if not provided
-        nsig = len(signals_to_plot)
-        ymax = row_step * nsig
-        if ax is None:
-            ax_provided = False
-            fig_height = row_height * nsig
-            fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-        else:
-            ax_provided = True
 
-
-        # Get min and max times.  If not provided, compute from signals
-        if trange is not None:
-            tmin, tmax = trange
-        else:
-            for i, s in enumerate(signals_to_plot):
-                si = self.sig_info[s]
-                if i == 0:
-                    tmin = si.times[0]
-                    tmax = si.times[-1]
-                else:
-                    tmin = min(tmin, si.times[0])
-                    tmax = max(tmax, si.times[-1])   
-
-        # Compute the borders if not provided as a fration of total time range
-        # Default is left border = 15% of time range, right border = 5% of time range
-        # This gives space for signal names on the left
-        time_range = tmax - tmin        
-        if left_border is None:
-            left_border = 0.10 * time_range
-        if right_border is None:
-            right_border = 0.05 * time_range
-
-        # Save the top and bottom y positions for each signal
-        self.ytop = dict()
-        self.ybot = dict()
-
-        for i, s in enumerate(signals_to_plot):
-            y =  ymax - (i + 0.5) * row_step  # vertical position for signal s
-            si = self.sig_info[s]
-            t_list = si.times 
-            sn = si.short_name
-
-            # Get the display values
-            si.get_values()
-            v_list = si.disp_values
-            
-            # Draw signal name
-            ax.text(tmin - 0.5, y, sn, ha='right', va='center', fontsize=10)
-
-            # Set the top and bottom y positions for the signal
-            ybot = y - 0.4 * row_step
-            ytop = y + 0.4 * row_step
-            self.ytop[sn] = ytop
-            self.ybot[sn] = ybot
-
-
-            # Draw horizontal segments between value changes
-            vlast = None
-            for j in range(len(t_list)):
-                t_start = t_list[j]
-                if j + 1 < len(t_list):
-                    t_end = t_list[j + 1]
-                else:
-                    t_end = tmax  # Extend to the right edge
-
-                # Skip if outside time range
-                if t_end < tmin or t_start > tmax:
-                    continue
-                t_start = max(tmin, t_start)
-                t_end = min(tmax, t_end)
-
-                v = v_list[j]
-
-                draw_top = True
-                draw_bot = True
-                draw_text = True
-                fill_gray = False
-                draw_vert = True
-                if (v in {'x', 'X', 'z', 'Z'}):
-                    draw_text = False
-                    fill_gray = True
-                if (si.two_level):
-                    if v == '1':
-                        draw_bot = False
-                        draw_text = False
-                    elif v == '0':
-                        draw_top = False
-                        draw_text = False
-                    if vlast is not None:
-                        if v == vlast:
-                            draw_vert = False
-                vlast = v
-    
-                # Draw a vertical line at the start of the segment                
-                if draw_vert:
-                    ax.vlines(t_start, ybot, ytop, color='black', linewidth=1)
-                if draw_bot:
-                    ax.hlines(ybot, t_start, t_end, color='black', linewidth=1)
-                if draw_top:
-                    ax.hlines(ytop, t_start, t_end, color='black', linewidth=1)
-
-                # Fill gray for unknown values
-                if fill_gray:
-                    ax.fill_betweenx([ybot, ytop], t_start, t_end, color='lightgray')
-
-                # Place text label in the middle of the segment
-                # Check if there is enough space to draw the text
-                if text_scale_factor <= 0:
-                    draw_text = False
-                if draw_text:
-                    idx_start = ax.transData.transform((t_start, y))
-                    idx_end = ax.transData.transform((t_end, y))
-
-                    if idx_end[0] - idx_start[0] < len(v)*text_scale_factor:
-                        draw_text = False
-                if draw_text:
-                    ax.text((t_start + t_end) / 2, y, v, ha='center', va='center',
-                            fontsize=10, color='black')
-
-
-        # Add clock grid lines if requested
-        if add_clk_grid:
-            clk_signal = None
-            for s, si in self.sig_info.items():
-                if si.is_clock:
-                    clk_signal = si.name
-                    break
-            if not clk_signal:
-                raise ValueError("No clock signal found in disp_signals for grid lines.")
-
-            for i, t in enumerate(si.times):
-                v = si.values[i]
-                if v == '1':
-                    ax.axvline(x=t, color='gray', linestyle='--', linewidth=0.5)
-
-        ax.set_yticks([])
-        ax.set_xlim(tmin - left_border, tmax + right_border)
-        ax.set_ylim(0, ymax)
-
-
-        return ax
-    
-    
     def extract_axis_bursts(
             self,
             clk_name : str,
