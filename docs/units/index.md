@@ -11,8 +11,14 @@ A tentative set of units is as follows.  I've only added a few units so far.
 For all units, I will add lecture notes and problems.
 
 * [Software and hardware set-up](./setup/)
-* [Unit 1:  Bulding a simple scalar function accelerator](./scalar_fun/)
-* [Unit 2:  Simple control register interfaces with AXI4-Lite](./procif/)
+* Unit 1:  Basic Digital Logic
+    * [Demo:  Building simple scalar functions](./basic_logic/)
+    * Lecture  [to be added]
+    * Problems [to be added]
+* Unit 2:  Bus basics and processor interfaces
+    * [Demo:  Connecting an IP with AXI4-Lite](./scalar_fun/)
+    * [Demo:  Deploying the IP on an FPGA](./procif/)
+* Unit 3:  Command-response 
 * [Unit 3:  Command-response FIFO interfaces and AXI4-Streaming](./fifoif/)
 * [Unit 4:  Loop optimization](./loopopt/)
 * Unit 5:  Load-Compute-Store Pattern

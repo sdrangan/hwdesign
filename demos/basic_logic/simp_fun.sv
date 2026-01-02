@@ -25,11 +25,8 @@ module simp_fun #(
     end
 
     // Registered output
-    always_ff @(posedge clk) begin
-        if (rst)
-            c_out <= '0;
-        else
-            c_out <= a_reg * b_reg;
+    always_comb begin
+        c_out = a_reg * b_reg;
     end
 
 endmodule

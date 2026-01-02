@@ -4,6 +4,50 @@ from vcdvcd import VCDVCD
 
 from xilinxutils.timing import SigTimingInfo
 
+def binary_str_to_numeric(
+        bin_str : str,
+        dtype : str,
+        wid : int) -> int | float:
+    """
+    Converts a binary string to a numeric value of the specified type.
+    Parameters
+    ----------
+    bin_str : str
+        Binary string to convert (e.g., '1101').
+    dtype : str
+        Target data type ('int', 'uint' or 'float').
+    wid : int
+        Width of the data type string. (e.g, 8, 16, 32, 64).
+    Returns
+    -------
+    value : int | float
+        Converted numeric value.
+    """
+
+    # Zero pad the binary string to the specified width
+    bin_str = bin_str.zfill(wid)
+
+    if dtype == 'int':
+        # Signed integer conversion
+        if bin_str[0] == '1':  # negative number
+            value = int(bin_str, 2) - (1 << wid)
+        else:
+            value = int(bin_str, 2)
+    elif dtype == 'uint':
+        # Unsigned integer conversion
+        value = int(bin_str, 2)
+    elif dtype == 'float':
+        # Float conversion (assuming IEEE 754 format)
+        if wid == 32:
+            int_value = int(bin_str, 2)
+            value = np.frombuffer(int_value.to_bytes(4, byteorder='big'), dtype=np.float32)[0]
+        elif wid == 64:
+            int_value = int(bin_str, 2)
+            value = np.frombuffer(int_value.to_bytes(8, byteorder='big'), dtype=np.float64)[0]
+    else:
+        raise ValueError(f"Unsupported data type: {dtype}")
+    return value
+
 class SigInfo(object):
     """
     Class to hold information about a VCD signal.
@@ -14,13 +58,10 @@ class SigInfo(object):
         Full name of the signal.
     two_level : bool
         True if the signal is two-level (0 and 1).
-    vcd_fmt : str
-        Format of the signal in VCD ('str' or 'binary').
-        Later we will add numeric formats
     numeric_type  : str
-        Type of numeric data ('str', 'int', 'float').
+        Type of numeric data ('str', 'int', 'uint', 'float').
     numeric_fmt_str : str
-        Format string for numeric display.  
+        Format string for numeric display.   If None, a default format is used.
     is_clock : bool
         True if the signal is identified as a clock.
     values : list of str
@@ -31,19 +72,25 @@ class SigInfo(object):
         List of signals values for display (after formatting).
     short_name : str
         Short name of the signal (e.g., last part of full name).
+    wid : int | None
+        Bitwidth of the signal.  If None, the bitwidth will be inferred
+        from the name.  For example, a signal named 'data[15:0]' has a bitwidth of 16.
     """
     def __init__(
             self,
             name : str,
             tv : list[tuple[int, str]],
-            time_scale : float = 1e3):
+            time_scale : float = 1e3,
+            numeric_type : str = 'uint',
+            numeric_fmt_str : None | str = None,
+            wid : int | None = None):
         self.name = name
         self.two_level = False
-        self.vcd_fmt = 'str' # 'str' or 'binary'
-        self.numeric_type = 'str' # 'str', 'int', 'float', 'hex'
-        self.numeric_fmt_str = '%X'  
+        self.numeric_type = numeric_type # 'int', 'uint', 'float'
+        self.numeric_fmt_str = numeric_fmt_str  
         self.is_clock = False
         self.time_scale = time_scale
+        self.wid = wid
 
         # Get time and value lists
         n  = len(tv)
@@ -66,6 +113,21 @@ class SigInfo(object):
         
         The format can be over-written later if needed.
         """
+
+        # Estimate the bitwidth if not provided
+        if self.wid is None:
+            parts = self.name.split('[')
+            if len(parts) > 1:
+                bit_range = parts[-1].strip(']')
+                msb_lsb = bit_range.split(':')
+                if len(msb_lsb) == 2:
+                    msb = int(msb_lsb[0])
+                    lsb = int(msb_lsb[1])
+                    self.wid = abs(msb - lsb) + 1
+                else:
+                    self.wid = 1
+            else:
+                self.wid = 1
     
         # Remove un-specified values
         filtered = [v for v in self.values if v not in {'x', 'X', 'z', 'Z'}]
@@ -73,14 +135,8 @@ class SigInfo(object):
         # Check if all values are single-bit '0' or '1'
         if all(v in {'0', '1'} for v in filtered):
             self.two_level = True
-            self.numeric_type  = 'int'
+            self.numeric_type  = 'uint'
             self.numeric_fmt_str = '%d'
-            self.vcd_fmt = 'binary'
-
-        # Check if all values are strings composed only of '0' and '1's
-        elif all(set(v).issubset({'0', '1'}) for v in filtered):
-            self.vcd_fmt = 'binary'
-            self.numeric_type  = 'int'
 
         # Check if clock signal
         if self.name:
@@ -88,11 +144,20 @@ class SigInfo(object):
             if 'clock' in name_lower or 'clk' in name_lower:
                 self.is_clock = True
 
+        # Set the numeric format string if not provided
+        if self.numeric_fmt_str is None:
+            if self.numeric_type == 'int':
+                self.numeric_fmt_str = f"%d"
+            elif self.numeric_type == 'uint':
+                self.numeric_fmt_str = f"%X"
+            elif self.numeric_type == 'float':
+                self.numeric_fmt_str = f"%.3f"
+            else:
+                self.numeric_fmt_str = "%s"  # default to string
+
     def get_values(self):
         """
         Converts the signal numeric and display values based on the format.   
-
-        Right now, `float` is not implemented.
         """
 
         # Return if already computed
@@ -105,9 +170,9 @@ class SigInfo(object):
             d = str(v)  # Default is to  display original value
             num_value = 0
             if not (v in {'x', 'X', 'z', 'Z'}):
-                if self.vcd_fmt == 'binary':
-                    num_value = int(v, 2)
-                    d = self.numeric_fmt_str % num_value                    
+                num_value = binary_str_to_numeric(
+                    v, self.numeric_type, self.wid)
+                d = self.numeric_fmt_str % num_value                    
             self.numeric_values.append(num_value)
             self.disp_values.append(d)
         self.numeric_values = np.array(self.numeric_values).astype(np.uint32)
@@ -144,7 +209,9 @@ class VcdParser(object):
     def add_signal(
             self,
             name : str,
-            short_name : str | None = None):
+            short_name : str | None = None,
+            numeric_type : str | None = None,
+            numeric_fmt_str : str | None = None):
         """ 
         Adds a signal to be processed
 
@@ -154,10 +221,19 @@ class VcdParser(object):
             Full name of the signal to add.
         short_name : str | None
             Short name to use for the signal.  If None, the last part of the full name is used.
+        numeric_type : str | None
+            Numeric type of the signal ('int', 'uint', 'float').
+        numeric_fmt_str : str | None
+            Format string for displaying the numeric values.
         """
         for s in self.vcd.signals:
             if s == name:
-                sig_info = SigInfo(name, self.vcd[s].tv, self.time_scale)
+                sig_info = SigInfo(
+                    name, 
+                    self.vcd[s].tv, 
+                    time_scale=self.time_scale,
+                    numeric_type=numeric_type,
+                    numeric_fmt_str=numeric_fmt_str)
                 self.sig_info[s] = sig_info                
                 if short_name is not None:
                     self.sig_info[s].short_name = short_name

@@ -3,6 +3,7 @@ import argparse
 import subprocess
 import os
 import sys
+import shutil
 from pathlib import Path
 
 def run(cmd, cwd=None):
@@ -23,6 +24,8 @@ def main():
                         help="Optional top module name (defaults to testbench filename without extension)")
     parser.add_argument("--sim", default="sim",
                         help="Simulation directory (default: sim)")
+    parser.add_argument("--keep", action="store_true",
+                        help="Keep existing sim directory (default: False, deletes before running)")
 
     args = parser.parse_args()
 
@@ -33,6 +36,12 @@ def main():
 
     # Create simulation directory
     sim_dir = Path(args.sim)
+    
+    # Delete sim directory if keep is not set
+    if not args.keep and sim_dir.exists():
+        shutil.rmtree(sim_dir)
+    
+    # Make the sim directory
     sim_dir.mkdir(parents=True, exist_ok=True)
 
     # Create logs directory inside sim/
