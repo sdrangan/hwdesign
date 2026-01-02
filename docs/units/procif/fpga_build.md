@@ -1,7 +1,7 @@
 ---
 title: Building the FPGA bitstream and PYNQ Overlay
-parent: Basic Processor Interface
-nav_order: 2
+parent: Bus Basics and Memory‑Mapped Interfaces
+nav_order: 5
 has_children: false
 ---
 # Creating the FPGA Bitstream and PYNQ Overlay

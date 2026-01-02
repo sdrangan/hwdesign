@@ -1,6 +1,6 @@
 ---
 title: RTL Simulation
-parent: Simple Scalar Accelerator
+parent: Bus Basics and Memory‑Mapped Interfaces
 nav_order: 3
 has_children: false
 ---
@@ -55,7 +55,8 @@ After you have created VCD file, you can see the timing diagram from the [jupyte
 
 ## Understanding the `xsim_vcd.py` function. 
 
-Instead of using the `xsim_vcd.py` function, you can manually modify the simulation to generate the VCD files with the following steps.
+I wrote the function  `xsim_vcd.py` to automate the process of adding a VCD trace.
+But you may want to know how this function works, in case you need to modify later.
 Basically, the `xsim_vcd.py` does these steps automatically.
 
 * After running the initial simulation, locate the directory where the simulation files are.

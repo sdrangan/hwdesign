@@ -1,7 +1,7 @@
 ---
 title: Accessing the IP from PYNQ
-parent: Basic Processor Interface
-nav_order: 3
+parent: Bus Basics and Memory‑Mapped Interfaces
+nav_order: 6
 has_children: false
 ---
 

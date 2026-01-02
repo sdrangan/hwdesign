@@ -1,18 +1,21 @@
 ---
-title: Addding the Vitis IP 
-parent: Basic Processor Interface
-nav_order: 1
+title: Packaging the Vitis IP 
+parent: Bus Basics and Memory‑Mapped Interfaces
+nav_order: 4
 has_children: false
 ---
 
-# Adding the Vitis IP to the FPGA Project
+# Creating an FPGA Project
 
-In the [previous unit](../scalar_fun/), we designed, synthesized, and simulated a simple Vitis IP in isolation.  
-We next create a Vivado project and add the IP to that project.
+Up to now, we designed, synthesized, and simulated a simple Vitis IP in isolation.  
+If you just want the simulation, that is fine.  But, if we want to deploy the
+IP to an actual FPGA and connect it to a processing system, we will need to next 
+we have to **package** the IP in a way that it can be used in the Vivado project,
+and add it to an FPGA project.
 
 ## Package the Vitis IP
 
-Before we can add the IP, we have to **package** the IP in a way that it can be used in the Vivado project.
+To package the IP:
 
 * [Luanch the Vitis GUI](../../support/amd/lauching.md) and open the workspace for the `scalar_fun` project
 * In the **FLOW** panel (left sidebar), select select **Package → Run**.  

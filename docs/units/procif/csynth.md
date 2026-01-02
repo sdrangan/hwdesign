@@ -1,6 +1,6 @@
 ---
 title: C Simulation and Synthesis 
-parent: Simple Scalar Accelerator
+parent: Bus Basics and Memory‑Mapped Interfaces
 nav_order: 2
 has_children: false
 ---
