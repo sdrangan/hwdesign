@@ -15,13 +15,14 @@ For all units, I will add lecture notes and problems.
     * [SystemVerilog Examples:  Simple scalar functions](https://github.com/sdrangan/hwdesign/tree/main/demos/basic_logic)
     * Lecture  [to be added]
     * Problems [to be added]
-* [Unit 2:  Bus basics and memory-mapped interfaces](./proc_if)
+* [Unit 2:  Bus basics and memory-mapped interfaces](./procif)
     * [Vitis HLS Example:  Simple AXI4-Lite interface](https://github.com/sdrangan/hwdesign/tree/main/demos/scalar_fun)
     * Lecture [to be added]
     * Problems [to be added]
 * [Unit 3:  Command-response FIFO interfaces](./fifoif/)
     * [Vitis HLS Example: AXI4-Streaming FIFO interface](https://github.com/sdrangan/hwdesign/tree/main/demos/fifoif)
 * [Unit 4:  Burst transfers and loop optimization](./loopopt)
+    * [Vitis HLS Example: A pipelined vector multiplier](https://github.com/sdrangan/hwdesign/tree/main/demos/loopopt)
 * Unit 5:  Load-Compute-Store Pattern
 * Unit 6:  Data types and precision
 * Unit 7:  Shared memory and the AXI4-Memory Map protocol
