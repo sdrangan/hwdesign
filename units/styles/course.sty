@@ -1,0 +1,130 @@
+% course.sty:  LaTeX style file for HW Design course materials
+
+% Requires PGF/TikZ and minted packages
+\RequirePackage{minted}
+\RequirePackage{pgf}
+\RequirePackage{tikz}
+\RequirePackage{mdframed}
+
+% Define minted environments for C, Python, and SystemVerilog
+\newminted{c}{
+    fontsize=\scriptsize,
+    linenos=False,
+    breaklines,
+    tabsize=2
+}
+
+\newminted{python}{
+    fontsize=\scriptsize,
+    linenos=False,
+    breaklines,
+    tabsize=2
+}
+
+\newminted{systemverilog}{
+    fontsize=\scriptsize,
+    linenos=False,
+    breaklines,
+    tabsize=2
+}
+
+
+
+% Load TikZ libraries
+\usetikzlibrary{shapes,arrows}
+\usetikzlibrary{circuits.logic.US}
+\usetikzlibrary{arrows.meta}
+\usetikzlibrary{positioning}
+\usetikzlibrary{shapes.geometric}
+\usetikzlibrary{calc}
+\usetikzlibrary{shapes.misc}
+\usetikzlibrary{shapes.symbols}
+\usetikzlibrary{fit}
+
+
+% Define a custom TikZ shape for a register
+\makeatletter
+\pgfdeclareshape{register}{
+  % Saved anchors
+  \savedanchor\northeast{
+    \pgfmathsetlength\pgf@x{\pgfshapeminwidth}
+    \pgfmathsetlength\pgf@y{\pgfshapeminheight}
+    \pgf@x=.5\pgf@x
+    \pgf@y=.5\pgf@y
+  }
+  \savedanchor\southwest{
+    \pgfmathsetlength\pgf@x{\pgfshapeminwidth}
+    \pgfmathsetlength\pgf@y{\pgfshapeminheight}
+    \pgf@x=-.5\pgf@x
+    \pgf@y=-.5\pgf@y
+  }
+
+  \inheritanchorborder[from=rectangle]
+
+  \anchor{center}{\pgfpointorigin}
+  \anchor{north}{\northeast \pgf@x=0pt}
+  \anchor{south}{\southwest \pgf@x=0pt}
+  \anchor{east}{\northeast \pgf@y=0pt}
+  \anchor{west}{\southwest \pgf@y=0pt}
+
+  % input: middle left
+  \anchor{input}{
+    \pgf@process{\southwest}
+    \pgf@y=0pt
+  }
+
+  % output: middle right
+  \anchor{output}{
+    \pgf@process{\northeast}
+    \pgf@y=0pt
+  }
+
+  % clk: bottom left
+  \anchor{clk}{
+    \pgf@process{\southwest}
+    \advance\pgf@y by 0.3cm   % move up without changing bounding box
+  }
+
+  % Drawing
+  \backgroundpath{
+    \pgfpathrectanglecorners{\southwest}{\northeast}
+
+  % Clock wedge
+	\pgf@anchor@register@clk
+	\pgf@xa=\pgf@x \pgf@ya=\pgf@y
+	\pgf@xb=\pgf@x \pgf@yb=\pgf@y
+	\pgf@xc=\pgf@x \pgf@yc=\pgf@y
+
+	% Independent horizontal and vertical sizes
+	\pgfmathsetlength\pgf@x{0.3cm}   % horizontal width (unchanged)
+	\pgfmathsetlength\pgf@y{0.1cm}   % vertical half-height (smaller)
+
+	\advance\pgf@ya by \pgf@y   % top point
+	\advance\pgf@xb by \pgf@x   % right point
+	\advance\pgf@yc by -\pgf@y  % bottom point
+
+	\pgfpathmoveto{\pgfpoint{\pgf@xa}{\pgf@ya}}
+	\pgfpathlineto{\pgfpoint{\pgf@xb}{\pgf@yb}}
+	\pgfpathlineto{\pgfpoint{\pgf@xc}{\pgf@yc}}
+	\pgfclosepath
+
+  }
+}
+\makeatother
+
+% Define a custom TikZ style for circular operations
+\tikzset{
+  circop/.style={
+    draw,
+    circle,
+    minimum size=3mm,
+    inner sep=0pt,
+    align=center
+  }
+}
+
+% Make a solution environment
+\definecolor{lightgray}{gray}{0.95}
+\newmdenv[linecolor=white,backgroundcolor=lightgray,frametitle=Solution:]{solution}
+
+\endinput

@@ -268,8 +268,9 @@ class TimingDiagram(object):
                     clk_signal = si.name
                     break
             if not clk_signal:
-                raise ValueError("No clock signal found in disp_signals for grid lines.")
-
+                add_clk_grid = False
+                
+        if add_clk_grid:
             for i, t in enumerate(si.times):
                 v = si.values[i]
                 if v == '1' and (tmin <= t) and (t <= tmax):
