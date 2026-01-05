@@ -26,7 +26,8 @@ After completion, the virtual environment files will be in a
 directory `env`.  This directory may be large.
 * Activate the virtual environment:
 ~~~bash
-.\env\Scripts\Activate.ps1  [Windows]
+.\env\Scripts\Activate.ps1  [Windows powershell]
+.\env\Scripts\activate.bat  [Windows command prompt]
 source env/bin/activate [MAC/Linux]
 ~~~
 On Windows Powershell, you may get the error message

@@ -97,3 +97,63 @@ Thumbs.db
 sim/
 synth/
 impl/
+
+# Core LaTeX auxiliary files
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex
+*.nav
+*.snm
+*.vrb
+
+# Bibliography
+*.bbl
+*.bcf
+*.blg
+*.run.xml
+
+# Index
+*.idx
+*.ilg
+*.ind
+
+# Glossaries
+*.acn
+*.acr
+*.alg
+*.glg
+*.glo
+*.gls
+*.ist
+
+# TikZ externalization
+*.dpth
+*.md5
+*.auxlock
+*.tikz
+*.pdf_tex
+
+# minted cache directory
+_minted-*
+
+# latexmk
+*.latexmk
+
+# VS Code LaTeX Workshop
+*.pdfdir
+*.pdfpc
+*.pdfsync
+
+# Output files
+*.dvi
+*.ps 
+
+# Minted cache directory
+_minted*/

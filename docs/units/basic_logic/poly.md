@@ -32,9 +32,9 @@ over multiple **stages**.
 This function is implemented in `hwdesign/demos/basic_logic/poly_fun.sv`.
 Within this code, you can see three stages:
 
-* Stage 0:  Register the input `x_s0 <= x`
-* Stage 1:  Compute and register the square `xsq_s1 <=  x*x` and the linear term `w1_x_s1 <= w1*x`.
-* Stage 2 (combinational):  Compute the output:  `y = w0*x + w1_x_s1 + w2`.
+* Stage 0:  Register the input `x_reg <= x`
+* Stage 1:  Compute and register the square `xsq <=  x*x` and the linear term `lin_term <= w1*x+w0`.
+* Stage 2 (combinational):  Compute the output:  `y = w2*x + lin_term`.
 This output is not registered to avoid additional delay.
 
 So, if the input `x` is valid in on the positive edge of clock cycle `n`, the output `y` is valid on the positive edge clock cycle `n+2`.  We say that the operation has a latency of 2.
