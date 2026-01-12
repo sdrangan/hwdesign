@@ -1,7 +1,0 @@
-question_name,grade,part_label,points
-Propagation delay,yes, ,0
-Critical path,yes,,10
-Sequential updates,no,,10
-Multi-cycle,yes,b,5
-Multi-cycle,yes,c,5
-Exponent,no,,10
