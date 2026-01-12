@@ -41,7 +41,7 @@ You may not be able use the latest version of Vivado/Vitis. You must install a v
    ./FPGAs_AdaptiveSoCs_Unified_2024.1_0522_2023_Lin64.bin
    ```
    This will run the installer
-* In Windows, you should be able to directly double click the extractor
+* In Windows, you should be able to directly double click the extractor. Follow the instructions at [Windows Installation](FPGA_intall_win.md)
 * For both systems, follow the prompts:
 - Select Vivado and Vitis
 - When prompted for Devices, make sure to select SoC
