@@ -1,5 +1,4 @@
 \documentclass[11pt]{article}
-
 \usepackage{fullpage}
 \usepackage{amsmath, amssymb, bm, cite, epsfig, psfrag}
 \usepackage{graphicx}
@@ -14,8 +13,8 @@
 \usepackage{siunitx}
 \usepackage{../../styles/course}
 
-
 \begin{document}
+
 
 \title{Introduction to Hardware Design\\
 Basic Digital Logic:  Solutions}
@@ -25,39 +24,7 @@ Basic Digital Logic:  Solutions}
 \maketitle
 
 \begin{enumerate}
-\item \qtag{Propagation delay} 
-\emph{Propagation delay}:   A signal $x$ has time-value change points
-\[
-    (10, 0), (20, 4), (30, 2)
-\]
-where the time is in nanoseconds.  The signal is passed through
-a circuit that produces $y = 2x+1$ with a propagation delay of \SI{3}{ns}.
-What are the time-value change points of $y$?  Use $\text{x}$ for unknown values.
 
-\begin{solution}
-Enter your solutions here.
-\end{solution}
-
-\item \qtag{Critical path} \emph{Critical path}: Consider the following SystemVerilog code:
-\begin{systemverilogcode}
-  always_ff @(posedge clk) begin
-      x1 <= 3*x1>>2 - 5*x>>3 + 7;
-      x2 <= 3*x1>>2 +  2;
-  end
-\end{systemverilogcode}
-Here \texttt{3*x>>2} denotes multiplication by 3 followed by a right shift
-by 2 bits (division by 4).  
-Assume that:
-\begin{itemize}
-\item Each multiplication with shift takes \SI{4}{ns}.
-\item Each addition or subtraction takes \SI{2}{ns}.
-\item Registers have zero delay.
-\end{itemize}
-What is the critical path delay of this circuit?
-
-\begin{solution}
-Enter your solutions here.
-\end{solution}
 
 \item \qtag{Sequential updates} \emph{Sequential updates}:
 Consider the following SystemVerilog code:
@@ -73,16 +40,58 @@ Consider the following SystemVerilog code:
 \end{systemverilogcode}
 Starting from $(x,v)=(15,10)$, what are the values of $(x,v)$
 for the next 5 clock cycles?
+
 \begin{solution}
-Enter your solutions here.
+Fill solution here.
 \end{solution}
 
 
 
-
-
-\item \qtag{Splitting paths} \emph{Splitting paths over multiple cycles}: Consider the following
+\item \qtag{Linear system} \emph{Linear system}: Consider the following
 SystemVerilog code:
+\begin{systemverilogcode}
+  always_ff @(posedge clk) begin
+      x1 <= ((5*x1 + 3*x2)>>3);
+      x2 <= ((4*x1 - 4*x2)>>3);
+  end
+\end{systemverilogcode}
+where \texttt{>>3} denotes a right shift by 3 bits (division by 8),
+and all values are 32-bit signed integers.
+  
+\begin{enumerate}[label=(\alph*)]
+    \item Suppose that $(x_1,x_2)=(8,0)$, what is the  value of
+    $(x_1,x_2)$ in the next clock cycle?  Remember that assignments (\texttt{<=}) 
+    are non-blocking, so they update in parallel.
+    \item Write a python function that simulates this linear 
+system with initial conditions \texttt{x1\_0} and \texttt{x2\_0} 
+for \texttt{nit} clock cycles and outputs the values in a array \texttt{X}
+of shape \texttt{(nit+1,2)}.
+The first row of \texttt{X} should be the initial conditions.  
+
+\end{enumerate}
+\begin{solution}
+Fill solution here.
+\end{solution}
+
+\item \qtag{ReLU function} \emph{ReLU function}:  We wish to implement the function:
+\[
+    y = ax^2 + \max\{ bx, 0\} + c,
+\] 
+for an input $x$ and constants $a$, $b$, and $c$.
+
+Write the SystemVerilog code to implement this function over two clock cycles.
+Specifically, the input $x$ should be registered in the first clock cycle, and the 
+output $y$ should be produced in the second clock cycle.
+Make sure that no clock cycle requires two or more multiplications that cannot 
+be parallelized. 
+
+\begin{solution}  Fill solution here.
+\end{solution}
+
+
+
+\item \qtag{ReLU+quadratic} \emph{ReLU+quadratic function}: 
+Consider the following SystemVerilog code:
 \begin{systemverilogcode}
   always_comb begin
       act_in = w1*xreg+b1;
@@ -91,7 +100,7 @@ SystemVerilog code:
       end else begin
           a = 0;
       end
-      xsq = xreg*xreg>>2;
+      xsq = ((xreg*xreg)>>2);
       y = xsq + w2*a + b2;
   end
   always_ff @(posedge clk) begin
@@ -101,29 +110,49 @@ SystemVerilog code:
 where \texttt{>>2} denotes a right shift by 2 bits (division by 4).
 So, the code registers the input \texttt{x} into \texttt{xreg} on each clock cycle,
 and produces the output \texttt{y} in a single clock cycle based on the registered value.
-The circuit is to be syntheized with components:
-\begin{itemize}
-\item Multiplication with shift:  \SI{4}{ns}
-\item Addition or subtraction:  \SI{2}{ns}
-\item Logic to compute $\max\{0,u\}$:  \SI{1}{ns}
-\item Registers:  zero delay
-\end{itemize}
 Assume that $w_1$, $b_1$, $w_2$, and $b_2$ are constants.
-
-\begin{enumerate}[label=(\alph*)]
-\item Draw a block diagram of the circuit showing an implementation of the circuit.
-If this is being auto-graded, you do not need to submit the diagram.  But, I will include it in the solutions.
-
-\item What is the critical path delay of this circuit?
-\item Rewrite the code to operate over two clock cycles instead of one
-to minimize the critical path delay.
-What is the critical path delay of the new circuit?
-\end{enumerate}
+Rewrite the code to operate over two clock cycles.  Specifically,
+register the input on $x$ on the first clock cycle, and compute the 
+output $y$ on the two clock cycles later. This requires introducing
+additional registers to store intermediate values.
 
 \begin{solution}
-Enter your solutions here.
+Fill solution here.
 \end{solution}
 
+
+\item \qtag{Bouncing ball} \emph{Bouncing ball}: 
+We simulate a ball moving in one-dimensional space between two walls at
+positions $0$ and $100$. The ball has a position $x$ and a velocity $v$.
+At each time step, the ball first moves according to its velocity:
+\[
+    x \gets x + v.
+\]
+If this motion causes the ball to go past a wall, the ball ``bounces'' and
+reverses direction. The bounce should behave the same way a real ball would:
+the ball cannot pass through the wall, and the rebound distance should be
+consistent with how far it would have travelled past the wall.
+
+For example:
+\begin{itemize}
+    \item If $(x,v) = (40,10)$, then the ball moves to $50$, which is inside
+    the interval, so the next state is $(50,10)$.
+
+    \item If $(x,v) = (96,10)$, then the ball would move to $106$, which is
+    past the right wall at $100$. After bouncing, the ball ends up at
+    position $94$ with velocity $-10$.
+
+    \item If $(x,v) = (3,-10)$, then the ball would move to $-7$, which is
+    past the left wall at $0$. After bouncing, the ball ends up at
+    position $7$ with velocity $10$.
+\end{itemize}
+
+Write the SystemVerilog code for the updates for $x$ and $v$.
+You do not need to include the module declaration, just the \texttt{always\_ff}
+and \texttt{always\_comb} blocks.
+
+\begin{solution}Fill solution here.
+\end{solution}
 
 
 \item \qtag{Exponent} \emph{Exponent}
@@ -144,12 +173,47 @@ the input $x$ and exponent $i$.  This problem is a bit hard
 since it uses pipelining.  We will discuss pipelining in more detail
 later units.
 
-\begin{solution}
-Enter your solutions here.
+\begin{solution} Fill solution here.
 \end{solution}
 
 
+\item \qtag{Testbench code} \emph{Testbench code}  A System Verilog Testbench
+instantiates a module to compute some function $y = f(x)$:
+
+\begin{systemverilogcode}
+// Testbench signals
+logic signed [31:0] x;
+logic signed [31:0] y;
+logic clk;
+    
+// Instantiate the device under test (dut)
+function dut (
+    .clk(clk),
+    .x(x),
+    .y(y)
+);
+
+// Test vectors
+logic signed [31:0] xtest [0:3] = '{10, 20, -5, 7};
+\end{systemverilogcode}
+
+Write an \texttt{initial} block that:
+\begin{itemize}
+\item On cycle 0, sets \texttt{rst=1}, and then de-asserts it on the next cycle.
+\item Starting on cycle 4, it sets \texttt{x=xtest[0]}, 
+prints the output \texttt{y} from the DUT on cycle 8.
+\item On cycle 9, it sets sets \texttt{x=xtest[1]}, 
+prints the output \texttt{y} from the DUT on cycle 12.
+\item Continue as above for the remaining test inputs.
+\end{itemize}
+To display a number you can use the syntax:
+\begin{systemverilogcode}
+$display("x = %0d", x)
+\end{systemverilogcode}
+
+\begin{solution}
+Fill solution here.
+\end{solution}
+
 \end{enumerate}
-
-  \end{document}
-
+\end{document}
