@@ -2,14 +2,23 @@
 title: Installing Vitis and Vivado
 parent: Vitis and Vivado
 nav_order: 1
-has_children: True
+has_children: Fakse
 ---
 
 # Installing Vivado and Vitis 
 
+## Overview
+The labs and demos in the class use Vitis and Vivado.  You can install these
+programs free of charge on your local machine, and these pages provide some instructions.
+But the programs take up a lot of space.
+Also, they work well only on Windows and Ubuntu.  On MacOS, you may need to run a
+virtual environment.  So, if you are an NYU student in the class,
+you can skip these instructions and work directly on the [NYU servers](./nyu_remote.md).
 
 ## Selecting the version
 
+If you decide to install the program on your local machine, you first need to decide
+which version to use.
 You may not be able use the latest version of Vivado/Vitis. You must install a version that matches a valid **Board Support Package (BSP)** for your board:  At the time of writing, the current versions are:
 
 * **RFSoC 4x2**:  Current version is 2024.1.  You can verify as follows.
@@ -52,6 +61,10 @@ You may not be able use the latest version of Vivado/Vitis. You must install a v
     ./installLibs.sh
 ~~~
 
+
 ---
 
-Next:  Go [launching Vitis and Vivado](./lauching.md)
+If you are installing on Windows, the TA Ruibin Chen has provided some helpful 
+[further instructions](./install_win.md).
+
+Otherwise, go to [launching Vitis and Vivado](./lauching.md)

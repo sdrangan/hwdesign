@@ -1,7 +1,7 @@
 ---
 title: Finding the FPGA part
 parent: Vitis and Vivado
-nav_order: 4
+nav_order: 5
 has_children: false
 --- 
 

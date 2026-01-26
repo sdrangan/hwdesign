@@ -60,6 +60,14 @@ The testbench can be run by using the `xilinxutils` function:
 sv_sim --source subc_divide.sv --tb tb_subc_divide.sv
 ```
 
+Note that if you are on the [NYU server](../../support/amd/nyu_remote.md), you will not have access
+to the `xilinxutils` package.  So you will have to run the command `sv_sim` directly.
+Assuming you cloned the `hwdesign` package in your home directory, run `sv_sim` as follows:
+
+```bash
+~/hwdesign/scripts/sv_sim --source subc_divide.sv --tb tb_subc_divide.sv
+```
+
 This will run the three steps in synthesizing and simulating the SV mdule.  The outputs will be stored in a CSV file, `test_outputs/tv_sv.csv`.
 
 You should see how many tests passed, and you can keep modifying the SV code until all test passed.

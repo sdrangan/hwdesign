@@ -1,12 +1,11 @@
 ---
-title: Windows Installation Instructions
-parent: Installing Vitis and Vivado
-nav_order: 1
-has_children: false
+title: Windows-specific instructions
+parent: Vitis and Vivado
+nav_order: 2
+has_children: False
 ---
 
-
-## Install Vitis and Vivado on Windows
+## Windows-Specific Instructions
 
 After registering the AMD account, you can download the unified installer for windows:
 
@@ -63,3 +62,7 @@ And then select "copy the licenses", where you select the downloaded "Xilinx.lic
 Successfully Installed：
 
 <img src="figs\success.png" alt="success" style="zoom:75%;" />
+
+---
+
+Next:  Go to [launching Vitis and Vivado](./lauching.md)

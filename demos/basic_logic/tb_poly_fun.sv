@@ -29,16 +29,18 @@ module tb_poly_fun;
         logic signed [WIDTH-1:0] x;
     } test_vector_t;
 
+    // Define test vectors
+    test_vector_t test_vectors[] = '{
+        '{x: 5},
+        '{x: -3},
+        '{x: 10},
+        '{x: 100},
+        '{x: 0},
+        '{x: 255}
+    };
+
     initial begin
-        // Define test vectors
-        test_vector_t test_vectors[] = '{
-            '{x: 5},
-            '{x: -3},
-            '{x: 10},
-            '{x: 100},
-            '{x: 0},
-            '{x: 255}
-        };
+        
 
         // Local temporaries for expected value computation
         logic signed [WIDTH-1:0] x;
