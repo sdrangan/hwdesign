@@ -84,7 +84,7 @@ npoints_hw = 20
 
 # Check if required files exist
 zip_files = [ os.path.join(os.getcwd(),'subc_divide.py'),\
-              os.path.join(os.getcwd(),'tb_subc_divide.sv'),\
+              os.path.join(os.getcwd(),'subc_divide.sv'),\
               os.path.join(tv_dir, 'tv_python.csv'),\
               os.path.join(tv_dir, 'tv_sv.csv')]
 for f in zip_files:

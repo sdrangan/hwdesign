@@ -19,7 +19,7 @@ The program will create a zip file `results.zip` with:
 
 - `results.json`:  A JSON file with the test results
 - `subc_divide.py`:  Your python implementation
-- `tb_subc_divide.py`:  Your SV implementation
+- `subc_divide.sv`:  Your SV implementation
 - `test_results/tv_python.csv` and `test_results/tv_sv.csv`:  The test vector files.
 
 Submit this zip folder on Gradescope on the lab assignment.  A Gradescope autograder will upload the grade.
