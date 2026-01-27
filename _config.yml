@@ -1,0 +1,17 @@
+title: "Hardware Design"
+description: "Modular, reproducible hardware/software co-design labs"
+remote_theme: just-the-docs/just-the-docs
+baseurl: "/hwdesign" # Only needed if using a project page
+url: "https://sdrangan.github.io"
+
+# Navigation settings
+nav_sort: case_insensitive
+search_enabled: true
+
+# Markdown options
+markdown: kramdown
+kramdown:
+  input: GFM
+
+# Optional: GitHub repo link
+github_repo_url: "https://github.com/sdrangan/hwdesign"
