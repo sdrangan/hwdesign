@@ -1,0 +1,93 @@
+\documentclass[11pt]{article}
+
+\usepackage{fullpage}
+\usepackage{amsmath, amssymb, bm, cite, epsfig, psfrag}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{amsthm}
+\usepackage{amsfonts}
+\usepackage{cite}
+\usepackage{hyperref}
+\usepackage{pgf,tikz}
+\usepackage{enumitem}
+\usepackage{mathtools}
+\usepackage{siunitx}
+\usepackage{../../styles/course}
+
+
+\begin{document}
+
+\title{Introduction to Hardware Design\\
+Numbers:  Figures and Code Snippets}
+\author{Profs. Sundeep Rangan, Siddharth Garg}
+\date{}
+
+\maketitle
+
+\subsection{Truncation}
+
+\begin{systemverilogcode}
+
+    logic signed [W-1:0] a = A;
+
+\end{systemverilogcode}
+
+\begin{systemverilogcode}
+    logic signed [W1-1:0] a;
+    logic signed [W2-1:0] b;
+
+    // Assign with truncation
+    b = a; // lower W2 bits of a assigned to b
+
+    // Assign with saturation
+    if (a > (1 << (W2 - 1)) - 1) begin
+        b = (1 << (W2 - 1)) - 1;
+    end else if (a < -(1 << (W2 - 1))) begin
+        b = -(1 << (W2 - 1));
+    end else begin
+        b = a;
+    end
+\end{systemverilogcode}
+
+
+Addition overflow
+\begin{systemverilogcode}
+logic signed [7:0] a;
+logic signed [10:0] b;
+logic signed [8:0] c;
+
+c = a + b; // potential overflow
+
+// SV implments with signed extension 
+// then truncation
+logic signed [10:0] cfull;
+cfull = $signed(a) + $signed(b);
+c = cfull[8:0]; // Truncation
+\end{systemverilogcode}
+    
+
+Simulating truncation in python:
+\begin{pythoncode}
+def truncate(x, n, signed=True):
+    mask = (1 << n) - 1
+    x = x & mask
+    if signed:
+        I = (x >= (1 << (n - 1)))
+        x -= (1 << n)*I
+    return x
+\end{pythoncode}
+
+\pagebreak
+\subsection{Multipication}
+\begin{systemverilogcode}
+logic signed [8:0] a;   // 9-bit signed
+logic signed [12:0] b;  // 13-bit signed
+logic signed [21:0] c1;  // 22-bit signed
+logic signed [20:0] c2;  // 21-bit signed
+
+c1 = a * b; // No overflow
+c2 = a * b; // Potential overflow
+\end{systemverilogcode}
+
+  \end{document}
+
