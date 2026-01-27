@@ -15,6 +15,7 @@ A tentative set of units is as follows.  I've only added a few units so far, but
     * Lecture:  [[PDF]](https://github.com/sdrangan/hwdesign/tree/main/units/unit01_basic_logic/basic_logic.pdf) [[pptx]](https://github.com/sdrangan/hwdesign/tree/main/units/unit01_basic_logic/basic_logic.pptx) 
     * [SystemVerilog Demo:  Simple scalar functions](../demos/basic_logic/)
     * [Problems](../../units/unit01_basic_logic/prob/basic_logic.html) 
+    * Lab:  [Division by conditional subtraction](../labs/subc/)
 * Unit 2:  Numeric Representations
     * [Review of number systems](../../units/unit02_numbers/review_numbers.pptx) from previous class
     * Lecture:  [[PDF]](https://github.com/sdrangan/hwdesign/tree/main/units/unit02_numbers/numbers.pdf) [[pptx]](https://github.com/sdrangan/hwdesign/tree/main/units/unit02_numbers/numbers.pptx) 
