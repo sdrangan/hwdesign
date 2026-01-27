@@ -24,7 +24,7 @@ This course is designed with the idea that *anyone* with a standard background i
 
 Hardware acceleration enables dramatically faster computation in myriad areas including machine learning, signal processing, scientific computation, and robotics to name a few.
 It is our hope that the material will be of value to students and
-engineers for any discipline that hardware can help. 
+engineers for any discipline that hardware can help.    
 ## Pre-Requisites and Target Audience
 
 This course is designed with the idea that *anyone* with a standard background in software can learn hardware with the right methodology.  *Anyone* can tap into the amazing performance that custom hardware can offer.
@@ -59,7 +59,7 @@ I would love to get your feedback -- positive or negative.  Feel free to email m
 
 ## Github pages
 
-Go to the [Github pages](https://sdrangan.github.io/hwdesign) for more.
+Go to the [Github pages](https://sdrangan.github.io/hwdesign/docs) for more.
 
 
 
