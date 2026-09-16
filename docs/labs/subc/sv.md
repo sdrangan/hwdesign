@@ -1,25 +1,34 @@
 ---
 title: System Verilog Implementation
 parent: Conditional Subtraction Division
-nav_order: 3
+nav_order: 4
 has_children: false
 ---
 
-# System Verilog Implementation
+# Stage 3: The SystemVerilog Implementation
+
+This stage has two halves, and they are in two different files. The **module**
+(`subc_divide.sv`) is the state machine that does the arithmetic. The
+**testbench** (`tb_subc_divide.sv`) is what hands it work and collects the
+answers. You write a piece of each, because the protocol between them only makes
+sense if you have implemented both ends of it.
 
 ## Handshaking protocol
 
-We now move to implementing the module in SystemVerilog.
-A skeleton for the conditional subtraction divider module is in the file `subc_divide.sv`.  Since the operation can take a variable number of clock cycles, it is useful
-to implement the transfer of inputs and outputs with a **handshaking protocol** with the following signals:  For the inputs to the module, we use the two signals:
+Since the operation takes a variable number of clock cycles, the transfer of
+inputs and outputs uses a **handshaking protocol**. For the inputs:
 
-* `output inready`:  Indicates that the module is ready for the next set of inputs, `a`, `b` and `nbits`
-* `input invalid`:  Set to indicate that there are valid data values for `a`, `b`, and `nbits`.   The module will start the processing of the data when `inready=invalid=1`.
+* `output inready`: Indicates that the module is ready for the next set of inputs, `a`, `b` and `nbits`
+* `input invalid`: Set to indicate that there are valid data values for `a`, `b`, and `nbits`. The module will start processing the data when `inready=invalid=1`.
 
-For the outputs from the module, we use the two signals:
+For the outputs:
 
-* `output outvalid`:  Indicates that the module processing is complete and a valid output `z` is available.
-* `input outready`:  Indicates to the module, that the data is ready to be accepted.  The module will consider the data as transferred when  `outready=outvalid=1`.
+* `output outvalid`: Indicates that the module processing is complete and a valid output `z` is available.
+* `input outready`: Indicates to the module that the data is ready to be accepted. The module will consider the data as transferred when `outready=outvalid=1`.
+
+The pattern — a `valid` from the sender, a `ready` from the receiver, transfer on
+the cycle both are high — is worth recognising. It is the same one AXI-Stream and
+most other on-chip interfaces use, and you will meet it again.
 
 ## State machine
 
@@ -34,62 +43,131 @@ We can manage the handshaking protocol in the module by using three states:
     - While running, `inready=0` and `outvalid=0`
     - After completing the `nbits` iterations, the module should move to `DONE`.
 * `DONE`:  The results are ready.  
-    - The module asserts `outvalid=1` and `inready=0` to indicate the resutls are ready, and `inready=0` to indicate that it is not ready yet for new inputs.
+    - The module asserts `outvalid=1` and `inready=0` to indicate the results are ready, and that it is not yet ready for new inputs.
     - When the signal `outready=1` the module assumes the outputs have been read,
     and moves to the `IDLE` state in the next iteration.
 
+## Writing the module
 
-## Completing and testing the code
-Use the states to complete the section marked `TODO` in `subc_divide.sv`.
-Then, when you are complete, I have created a testbench in `tb_subc_divide.sv`.
-The testbench:
+Complete the section marked `TODO` in `subc_divide.sv`. You write two blocks:
 
-- Reads the `test_vectors/tv_python.csv` files with the test inputs `a`, `b`, `nbits` and outputs `z` from the Golden python model
-- Runs each input to the SV module and gets the output `z`
-- Compares the `z` from the python golden model with the implementation
-- Writes the results to a file `test_vectors/tv_sv.csv`
+* an `always_comb` that computes the next value of every register from the
+  current ones, and
+* an `always_ff @(posedge clk)` that commits them.
 
-The testbench can be run by using the `xilinxutils` function (if you are running the
-code on the NYU server, go to the next section):
-- Open a terminal in Unix or command window in Windows (On Windows, you cannot use Powershell)
-- Activate the virtual environment with the `xilinxutils` package
-- Follow the [instructions](../../support/amd/launching.md) to set the path for Vivado tools
-- Navigate to the `hwdesign/labs/subc` directory
-- Run
+Splitting it that way is the standard shape for a state machine — the decisions
+in one place, the clocking in another.
 
-```bash
-sv_sim --source subc_divide.sv --tb tb_subc_divide.sv
+The combinational block must assign *every* `_next` signal on *every* path, or you
+infer a latch. The usual way is to start with defaults that hold the current
+value, then override them per state:
+
+```systemverilog
+a_next = a_reg;  b_next = b_reg;  z_next = z_reg;
+count_next = count;  state_next = state;
 ```
 
-This will run the three steps in synthesizing and simulating the SV mdule.  The outputs will be stored in a CSV file, `test_outputs/tv_sv.csv`.
+The `RUN` state is one iteration of exactly the algorithm you already wrote in
+Python. Two things to watch:
 
-You should see how many tests passed, and you can keep modifying the SV code until all test passed.
-I suggest that you modify the testbench to get more visibility until you pass the tests.
+* **Compare the shifted value against `b_reg`, not `a_reg`.** The comparison is on
+  the remainder after the shift, which is the whole point of "bring down the next
+  bit".
+* **Drive the outputs from the *current* state, not the next one.** `inready`,
+  `outvalid` and `z` describe what the module is doing now:
 
-## Running the Simulation on the NYU Server
-
-Note that if you are on the [NYU server](../../support/nyuremote/),
-you should follow the specialized [python instructions](../../support/nyuremote/python.md).
-In particular, follow those instructions to:
-- log into the server
-- clone the repository `hwdesign` to your home directory so it is at `~/hwdesign`
-- install the `uv` utility
-- create and activate a virtual environment
-- install the python package with `uv` in that environment.
-
-Once you have done these steps, you can run the script with
-
-```bash
-(hwdesign) uv run sv_sim --source subc_divide.sv --tb tb_subc_divide.sv
+```systemverilog
+inready  = (state == IDLE);
+outvalid = (state == DONE);
+z        = z_reg;
 ```
 
-## Running the Simulation with the Vivado GUI
+## Writing the testbench
 
-The above flow uses command line only.  If you prefer,
-you can follow the [instructions for using the Vivado GUI](../../support/amd/sv_build.md).
-Running the GUI will create the same files.  You can also edit your
-SystemVerilog files in the Vivado editor.
+The reading of the test vectors, the writing of the results and the counting of
+clock cycles are all given. What you write is the handshake itself — the `TODO` in
+`tb_subc_divide.sv` marks it. Four things have to happen, in order:
+
+1. Wait until the module is ready (`inready`), then hold `invalid` high across one
+   posedge and drop it again.
+2. Wait for `outvalid`, counting posedges into `cycle_count`.
+3. Sample `zgot = z` **while `outvalid` is still high** — that is the only time the
+   module promises `z` means anything.
+4. Hold `outready` high across one posedge and drop it, which is how the module
+   learns the answer has been taken.
+
+{: .important }
+> **Bound the wait loop.** Write step 2 as
+> `while (!outvalid && cycle_count < MAX_WAIT)`, not as `while (!outvalid)`.
+>
+> A module that never asserts `outvalid` — which is exactly what a half-finished
+> state machine is — would otherwise hang the simulation, and a simulator that
+> never returns looks precisely like one that is working hard. A failed case is
+> far more useful than a run that never ends. If the loop times out, increment
+> `timeouts` and leave `zgot` and `cycle_count` alone; the build scores an
+> unanswered case as the failure it is.
+
+There is a watchdog in the testbench as a backstop, outside the part you write. If
+the whole simulation is still going after 500 µs it prints a diagnosis and stops,
+so a stuck design costs you seconds rather than a coffee break. If you see
+
+```
+TIMEOUT: still running after 500 us of simulated time.
+```
+
+then the module stopped handshaking: check that the state machine leaves `RUN`
+after `nbits` iterations, asserts `outvalid` in `DONE`, and returns to `IDLE` once
+`outready` is seen.
+
+## Running the stage
+
+```bash
+python subc_build.py --through svsim
+```
+
+This compiles both files, runs the simulation, and compares the result against
+your Python — you do not invoke the simulator yourself. If the compile fails, that
+is reported as a score of zero with the tool output attached, rather than as a
+traceback that leaves you with no submission.
+
+```
+SystemVerilog divider: 10/10
+  ✓ (6/6) SystemVerilog matches your Python model
+  ✓ (4/4) Each case finishes within nbits + 2 cycles
+```
+
+Both are scored proportionally, and the feedback names the first case that failed
+with its `a`, `b` and `nbits`, what Python said and what the simulation said.
+
+The latency check is only credited on cases that were **answered correctly**. Fast
+and wrong is not a design, and timing a case whose answer is wrong measures
+nothing. A correct machine spends one cycle in `IDLE`, `nbits` in `RUN` and one in
+`DONE`, so `nbits + 2` is a comfortable allowance rather than a tight one.
+
+{: .warning }
+> The comparison is against *your* Python model, not against ours. That means two
+> unimplemented halves would agree with each other perfectly — so if your Python
+> returns the same `z` for every case, this stage scores zero regardless of what
+> the simulation did, and says so. Fix `subc_divide.py` first.
+
+## Running on the NYU server
+
+If you are on the [NYU server](../../support/nyuremote/), follow the
+[python instructions](../../support/nyuremote/python.md) to log in, clone the
+repository, install `uv`, and create and activate the virtual environment. Then
+run the build through `uv`:
+
+```bash
+uv run python subc_build.py --through svsim
+```
+
+## Using the Vivado GUI
+
+The flow above is command line only. If you prefer, you can follow the
+[instructions for using the Vivado GUI](../../support/amd/sv_build.md), and you
+can edit your SystemVerilog in the Vivado editor. Run the build afterwards to be
+scored.
 
 ---
 
-Go to [submission](./submit.md)
+Go to [grading and submission](./submit.md)

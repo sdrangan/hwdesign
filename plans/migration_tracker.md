@@ -53,7 +53,7 @@ for that unit; the demo/lab rows are the runnable material.
 ### unit03_fixp
 | File | refs | category | status | integration notes |
 |---|---|---|---|---|
-| [demos/fixp/piecewise.ipynb](../demos/fixp/piecewise.ipynb) | x:1 | dead-xilinxutils | todo | **recommended first unit** — maps to `waveflow.hw.fixpoint` + `waveflow.utils.fixputils` |
+| [demos/fixp/piecewise.ipynb](../demos/fixp/piecewise.ipynb) | x:1 | dead-xilinxutils | integrated | Import-only swap: `xilinxutils.fixputils` → `waveflow.utils.fixputils`. `truncate`/`saturate` kept identical signatures `(x, wid, signed=True)`, so no call sites changed. `waveflow.hw.fixpoint` was **not** needed — the demo teaches manual `>>fbits` scaling, which the `Format` API would hide. Colab cell now installs waveflow (old URL also had a `srangan` typo). Verified: notebook executes clean and regenerates `test_vectors/tv_w16_f8.csv` **byte-identical** to the committed file. |
 
 ### unit04_procif
 | File | refs | category | status | integration notes |
@@ -132,7 +132,7 @@ for that unit; the demo/lab rows are the runnable material.
 | [labs/intersect/partial/line_inter.ipynb](../labs/intersect/partial/line_inter.ipynb) | p:6 | live-pysilicon | todo | |
 | [labs/intersect/run_hls.tcl](../labs/intersect/run_hls.tcl) | p:3 | live-pysilicon | todo | TCL include paths |
 | [docs/labs/intersect/csynth.md](../docs/labs/intersect/csynth.md) | p:1 | live-pysilicon | todo | |
-| [docs/labs/subc/sv.md](../docs/labs/subc/sv.md) | x:2 | dead-xilinxutils | todo | |
+| [docs/labs/subc/sv.md](../docs/labs/subc/sv.md) | x:2 | dead-xilinxutils | **integrated** | ✅ 2026-09-15 — the whole `subc` lab was rebuilt on labkit + the build DAG (see `plans/subc_lab.md`), which retired the `sv_sim --source ... --tb ...` invocation these two references lived in. Students now run `python subc_build.py --through svsim` and the build calls `waveflow.scripts.sv_sim.run_sv_sim` itself. Lab docs are now free of xilinxutils. |
 | _labs/rootsolve_ | — | — | — | no old refs found; verify at integration |
 
 ## Projects & planning docs
