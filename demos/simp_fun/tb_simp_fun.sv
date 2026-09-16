@@ -10,7 +10,7 @@ module tb_simp_fun;
     logic [WIDTH-1:0] a_in, b_in;
     logic [WIDTH-1:0] c_out;
 
-    always #(CLK_PERIOD/2) clk = ~clk;   
+    always #(CLK_PERIOD/2) clk = ~clk;  
 
     simp_fun #(
         .WIDTH(WIDTH)
