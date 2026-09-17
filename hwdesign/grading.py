@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import sys
 import time
 import traceback
 import zipfile
@@ -560,14 +561,45 @@ def run_graded_dag_cli(dag_factory, *, root_dir: Path, graded_steps, **kwargs) -
     ``graded_steps`` is a zero-arg callable returning the lab's graded steps in
     report order.
     """
-    import sys
-
     from waveflow.build.cli import run_dag_cli
+
+    _use_utf8_output()
 
     if "--grades" in sys.argv:
         print_grade_summary(root_dir, graded_steps())
         return
     run_dag_cli(dag_factory, root_dir=root_dir, **kwargs)
+
+
+def _use_utf8_output() -> None:
+    """Make stdout and stderr able to carry the feedback marks.
+
+    The bullets use ``✓``, ``✗``, ``·`` and ``—``, and Python takes stdout's
+    encoding from the environment: ``cp1252`` on a default Windows console, and
+    ``cp1252`` again whenever output is piped or redirected, whatever the
+    console is set to.  Without this a student gets
+
+        UnicodeEncodeError: 'charmap' codec can't encode character '\\u2713'
+
+    and a traceback where the grade should be — for a lab that ran perfectly.
+
+    Only the streams need it.  Both JSON writers already pass
+    ``encoding="utf-8"`` explicitly, and ``json.dumps`` escapes non-ASCII by
+    default, so the eval records and ``submitted_results.json`` were never at
+    risk — nor is Gradescope, which copies that JSON without printing it.
+
+    Called from :func:`run_graded_dag_cli`, which is the one entry point every
+    lab's ``main()`` goes through, rather than at import: a module that quietly
+    reconfigures the interpreter's streams when imported would be a nasty
+    surprise to anything embedding this.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        # Guarded because stdout is not always a reconfigurable text stream —
+        # pytest's capture replaces it, and a closed or detached stream raises.
+        try:
+            stream.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+        except (AttributeError, ValueError, OSError):
+            pass
 
 
 def _num(value: float) -> str:
