@@ -370,3 +370,56 @@ def test_report_consumes_every_eval_so_it_cannot_bundle_a_stale_score(tmp_path):
     report = GradeReportStep(name="submit", graded=steps, bundle=[])
     dag.add(report)
     assert report.consumes == ["prng_py_eval", "prng_sim_eval"]
+
+
+# ---------------------------------------------------------------------------
+# Output encoding
+# ---------------------------------------------------------------------------
+#
+# The feedback bullets use ✓, ✗, · and —, and Python takes stdout's encoding
+# from the environment — cp1252 on a default Windows console, and cp1252 again
+# whenever output is piped, whatever the console is set to.  Before
+# _use_utf8_output existed, that meant a UnicodeEncodeError and a traceback
+# where the grade should be, for a lab that had run perfectly.
+
+def test_marks_survive_a_cp1252_stream():
+    """The glyphs encode once the stream has been reconfigured.
+
+    Written against a real ``TextIOWrapper`` over a cp1252 buffer, which is what
+    a piped stdout on Windows actually is — mocking the encoding would test the
+    mock rather than the reconfigure.
+    """
+    import io
+
+    from hwdesign.grading import Check, _use_utf8_output
+
+    line = Check("Values are in range", 3.0, 3.0).line()
+    buffer = io.BytesIO()
+    stream = io.TextIOWrapper(buffer, encoding="cp1252")
+
+    with pytest.raises(UnicodeEncodeError):
+        stream.write(line)
+        stream.flush()
+
+    stream.reconfigure(encoding="utf-8")
+    stream.write(line)
+    stream.flush()
+    assert "✓" in buffer.getvalue().decode("utf-8")
+
+
+def test_reconfigure_is_guarded_against_streams_that_cannot_take_it(monkeypatch):
+    """A stream without ``reconfigure`` must not bring the grader down.
+
+    This is the part worth pinning: the whole point is to stop one crash, so a
+    fix that introduces a different one on a stream it did not expect — pytest's
+    own capture, a closed handle, a plain object standing in for stdout — would
+    be worse than the bug.
+    """
+    from hwdesign.grading import _use_utf8_output
+
+    class NotAStream:
+        pass
+
+    monkeypatch.setattr("sys.stdout", NotAStream())
+    monkeypatch.setattr("sys.stderr", NotAStream())
+    _use_utf8_output()          # must not raise
