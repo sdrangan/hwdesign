@@ -27,8 +27,10 @@
 > bound was written backwards in `subc_divide.py`'s docstring
 > (`qhat < a/b <= qhat + 2^-nbits`), and `theory.md` gave `z`'s range as
 > `2**(nbits-1) - 1`. One pre-existing bug is **not** fixed and is reported
-> separately: `hwdesign/grading.py` crashes with `UnicodeEncodeError` when
-> stdout is not UTF-8, which affects `prng` identically.
+> separately: `hwdesign/grading.py` crashed with `UnicodeEncodeError` when
+> stdout was not UTF-8, which affected `prng` identically. Fixed 2026-09-17 on
+> `fix/grading-stdout-encoding` -- `run_graded_dag_cli` now calls
+> `_use_utf8_output()` before anything prints.
 
 Bring the Unit 2 conditional-subtraction divider up to the shape `labs/prng` now
 has: one annotated solution in `hwdesign-soln`, the student tree **generated**
