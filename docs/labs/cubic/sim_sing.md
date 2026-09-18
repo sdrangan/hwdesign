@@ -1,108 +1,132 @@
 ---
-title: Single Test Case
+title: Debugging one case
 parent: Cubic Fixed Point
-nav_order: 3
+nav_order: 4
 has_children: false
 ---
 
-# Simulating a Single Test Case
+# Debugging one case
 
-## Setting up the Testbench
+`svsim` tells you *how many* cases disagree. It cannot tell you which product
+overflowed. For that there is a fourth build step:
 
-Before you run through all the test cases, it is useful to
-get a single test case working.  For this purpose, I have written a testbench file,
-`tb_cubic_sing.sv`.  You can modify it to validate your code with a simple,
-configurable test case as follows:
-
-- The testbench instantiates an instance of the module `cubic` as the
-**DUT**  (device under test).  You do not need to change this part of the code.
--  At the top of the file, the testbench sets sets a single set of input values
-for `x` and `a`.  You can change these values to try different inputs.
-But these values are good to start.  In particular, they are small enough
-that nothing should saturate.
-
+```bash
+python cubic_build.py --through svsing
 ```
-// Test value parameters (real)
-localparam real xr_test  = 2.5;
-localparam real a0r_test = 1.0;
+
+It runs one case — one you choose — through `tb_cubic_sing.sv` and prints every
+pipeline register on every clock.
+
+**Nothing here is graded and nothing here is submitted.** It exists so that the
+answer to "why is case 117 wrong" is a table rather than a guess. It is a build
+step like the others because everything in this lab is, and because the DAG then
+knows to re-run it when you edit `cubic.sv` — but no step in the `submit` chain
+depends on it, so a plain `python cubic_build.py` skips it entirely.
+
+You can run it at any point, including before `svsim` has ever passed.
+
+## Setting up the case
+
+At the top of `tb_cubic_sing.sv`:
+
+```systemverilog
+localparam real xr_test  =  2.5;
+localparam real a0r_test =  1.0;
 localparam real a1r_test = -0.5;
-localparam real a2r_test = 0.25;
+localparam real a2r_test =  0.25;
 ```
 
-- Next, **complete the `TODO` section**:  
-This section converts the real values to integers and computes an *expected*
-integer and real output from the .  Change the code in the section to match whatever
-exact integer operation you used in `cubic`.  
+Change these to the case you want to look at. As given, nothing saturates at
+`FBITS=8` — a good place to start. To see the saturating behaviour, change
+`FBITS` to 12 a few lines above, or push `x` out towards 2.0.
 
-- The testbench takes the the specified input values and drives the DUT with the values.
-- In parallel, the testbench monitors the DUT output `y` and any internal signals over about 10 clock cycles.
-- The test passes if the output `y` from the DUT matches the expected value.
-- The testbench also capture various monitoring of internal signals that are useful to debugging.
+When `svsim` reports a disagreement it prints the offending inputs as *integers*:
 
-
-## Running the Test
-
-Once you have set up the testbench, you can run the test from the command line using `xilinxutils` function, `sv_sim`:
-
-- Open a terminal in Unix or command window in Windows (On Windows, you cannot use Powershell)
-- Activate the virtual environment with the `xilinxutils` package
-- Follow the [instructions](../../support/amd/launching.md) to set the path for Vivado tools
-- Navigate to the `hwdesign/labs/subc` directory
-- Run
-
-```bash
-sv_sim --source cubic.sv --tb tb_cubic_sing.sv
+```
+the first is row 117, where x=-7478, a0=-12239, a1=-11069, a2=-9137
 ```
 
-You should get an output as follows.  
-```bash
-=== Cubic Fixed Point Testbench ===
+Those are `Q(16,12)` values, so divide each by `2**12 = 4096` to get the real
+numbers to type in above — and set `FBITS` to 12 to match.
+
+## Completing `expected_y()`
+
+This is the one thing you write in this file, and it is worth understanding why
+it is not simply handed to you.
+
+The real-valued answer is **not** the right target. Your module truncates on every
+shift and clamps on every saturation, so its output differs from the exact value
+by a little at `F=8` and by a lot at `F=12`. Comparing against the exact answer
+would report a failure on a module that is working perfectly.
+
+So `expected_y()` asks you to state, in integers, what you believe your own
+design computes:
+
+```systemverilog
+x2  = sat_i((longint'(x_test) * x_test) >>> FBITS);
+ax1 = ...
+```
+
+Use exactly the operations your `cubic.sv` uses — the same shifts, the same
+`sat_i` calls, in the same order. If it then disagrees with the DUT, one of the
+two is where your bug is, and the register trace tells you which.
+
+Cast one operand of each product to `longint` so the multiply happens in 64 bits.
+`x_test` and friends are `int`, and two of them multiplied can overflow 32 bits
+before the shift brings the value back down.
+
+`sat_i` is given.
+
+## Reading the output
+
+```
+=== Cubic Fixed Point: one case ===
 Parameters: WID=16, FBITS=8
 
-Test Inputs:
-  x  = 0 (2.5000)
-  a0 = 0 (1.0000)
-  a1 = 0 (-0.5000)
-  a2 = 0 (0.2500)
+Test inputs:
+  x  =    640  (2.5000)
+  a0 =    256  (1.0000)
+  a1 =   -128  (-0.5000)
+  a2 =     64  (0.2500)
 
-Expected output:
-  y  = 4336 (16.9375)
+Exact real answer:      16.9375
+Your expected_y():        4336  (16.9375)
 
-=== Monitoring Internal Signals ===
-Cycle | x_s0  | x2_s1  | ax1_s1 | x_s1  | y
+=== Pipeline registers, cycle by cycle ===
+Cycle |  x_s0 |  x2_s1 | ax1_s1 |  x_s1 |      y
 ------|-------|--------|--------|-------|-------
-    0 |     0 |      0 |      0 |     0 |     0
-    1 |     0 |      0 |      0 |     0 |     0
-    2 |   640 |      0 |      0 |     0 |     0
-    3 |   640 |   1600 |    -64 |   640 |  4336
-    4 |   640 |   1600 |    -64 |   640 |  4336
-    5 |   640 |   1600 |    -64 |   640 |  4336
-    6 |   640 |   1600 |    -64 |   640 |  4336
-    7 |   640 |   1600 |    -64 |   640 |  4336
-    8 |   640 |   1600 |    -64 |   640 |  4336
-    9 |   640 |   1600 |    -64 |   640 |  4336
+    0 |     0 |      0 |      0 |     0 |      0
+    1 |     0 |      0 |      0 |     0 |      0
+    2 |   640 |      0 |      0 |     0 |      0
+    3 |   640 |   1600 |    -64 |   640 |   4336
+    4 |   640 |   1600 |    -64 |   640 |   4336
+    ...
 
-TEST PASSED: Output y matches expected value 4336
+TEST PASSED: y = 4336, which is what expected_y() said.
 ```
 
+The trace is the point. You can see the value move through the pipeline one stage
+per clock: `x_s0` at cycle 2, then `x2_s1` and `ax1_s1` at cycle 3, and `y`
+combinationally from there. It settles after two clocks and holds, because the
+inputs are held.
 
-## Running the Simulation on the NYU Server
+**Check `x2_s1` first.** Every later term is built from it, so a wrong square
+makes `x3`, `ax2` and `y` all wrong at once and the other three columns tell you
+nothing you did not already know. Here `x = 2.5` is `640`, and
+`640 * 640 >> 8 = 1600`, which is `6.25` — correct.
 
-If you are on the [NYU server](../../support/nyuremote/),
-you should follow the specialized [python instructions](../../support/nyuremote/python.md).
-In particular, follow those instructions to:
-- log into the server
-- clone the repository `hwdesign` to your home directory so it is at `~/hwdesign`
-- install the `uv` utility
-- create and activate a virtual environment
-- install the python package with `uv` in that environment.
+## Running it in the Vivado GUI
 
-Once you have done these steps, you can run the script with
+The step leaves its simulation in `sim/sing/`, so you can open the waveform
+database there if you would rather look at signals than at a table. If you are on
+the [NYU server](../../support/nyuremote/), follow the
+[uv instructions](../../support/nyuremote/python.md) and run the step through
+`uv`:
 
 ```bash
-(hwdesign) uv run sv_sim --source cubic.sv --tb tb_cubic_sing.sv
+uv run python cubic_build.py --through svsing
 ```
 
----  
+----
 
-Go to [validate against the test vectors](./test.md).
+Go to [grading and submission](./submit.md).

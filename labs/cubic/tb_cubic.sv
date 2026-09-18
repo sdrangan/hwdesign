@@ -1,198 +1,221 @@
 `timescale 1ns/1ps
-
+// -----------------------------------------------------------------------------
+// Testbench: tb_cubic
+// Description:
+//   Reads the cases your Python model produced, runs each one through
+//   cubic_fixed, and writes what the hardware returned to a CSV the build
+//   script scores.
+//
+//   The lab uses two fixed-point settings, Q(16,8) and Q(16,12), and FBITS is a
+//   module *parameter* -- fixed at elaboration, not something a plusarg can
+//   change.  So rather than run the simulator twice, this testbench holds two
+//   instances of the DUT, one per setting, driven from the same wires.  Each row
+//   of the vector file says which setting it belongs to, and the row is scored
+//   against that instance's output.  The other instance computes something
+//   meaningless for that row, and nobody looks at it.
+//
+//   The vector directory arrives as a plusarg from the build script, so this
+//   file needs no editing to move it.
+//
+//   YOU DO NOT NEED TO EDIT THIS FILE.  Your work goes in cubic.sv.
+// -----------------------------------------------------------------------------
 module tb_cubic;
 
-    // Parameters
-    localparam int WID = 16;
-    localparam int FBITS = 8;
-    localparam time CLK_PERIOD = 10ns;  // 100 MHz clock
+    localparam int WID         = 16;
+    localparam int FBITS_SMALL = 8;
+    localparam int FBITS_LARGE = 12;
+    localparam time CLK_PERIOD = 10ns;   // 100 MHz
 
-    // DUT signals
+    //: Rows printed to the console.  Every row is written to the file.
+    localparam int SHOW = 8;
+
+    //: Clocks to wait after driving a case before sampling y.  The pipeline
+    //: registers the inputs on one edge and the stage 1 values on the next, and
+    //: y is combinational from there -- so two edges is enough and three is the
+    //: margin.  Inputs are held steady across the wait, so waiting longer than
+    //: necessary cannot change the answer.
+    localparam int PIPE_WAIT = 3;
+
     logic clk;
     logic rst;
-    logic signed [WID-1:0] x;
-    logic signed [WID-1:0] a0, a1, a2;
-    logic signed [WID-1:0] y;
+    logic signed [WID-1:0] x, a0, a1, a2;
+    logic signed [WID-1:0] y_small, y_large;
 
-    // Instantiate DUT
-    cubic_fixed #(
-        .WID(WID),
-        .FBITS(FBITS)
-    ) dut (
-        .clk(clk),
-        .rst(rst),
-        .x(x),
-        .a0(a0),
-        .a1(a1),
-        .a2(a2),
-        .y(y)
-    );
+    // One instance per setting.  Both see the same inputs; which output is
+    // recorded is decided per row, from the file.
+    cubic_fixed #(.WID(WID), .FBITS(FBITS_SMALL)) dut_small (
+        .clk(clk), .rst(rst), .x(x), .a0(a0), .a1(a1), .a2(a2), .y(y_small));
 
-    // Clock generator
+    cubic_fixed #(.WID(WID), .FBITS(FBITS_LARGE)) dut_large (
+        .clk(clk), .rst(rst), .x(x), .a0(a0), .a1(a1), .a2(a2), .y(y_large));
+
     initial clk = 0;
     always #(CLK_PERIOD/2) clk = ~clk;
 
-    // CSV file names
-    string fn;
-    string fn_out;
-    
-    // CSV reading variables
+    string  vecdir;
+    string  fn, fn_out;
+    string  rest_of_line;
+
     integer file_handle;
     integer out_file_handle;
     integer scan_result;
-    string header_line;
+    string  header_line;
     integer line_num;
-    
-    // Test vector variables
-    logic signed [WID-1:0] xint;
-    logic signed [WID-1:0] aint0, aint1, aint2;
-    real y_float;
+
+    int                    fbits_test;
+    logic signed [WID-1:0] xint, aint0, aint1, aint2;
     logic signed [WID-1:0] yint_expected;
-    real yfix_expected;
-    
-    // Statistics
-    integer num_passed, num_failed;
-    integer num_tests;
+    logic signed [WID-1:0] y_dut;
 
-    // DUT internal signals for debugging
-    logic signed [WID-1:0] x_dut;
+    integer num_passed, num_failed, num_unknown;
 
-    // Version flag
-    // Set to 0 to use original $fscanf format (decimal, signed)
-    // Set to 1 to read values one at a time to avoid Vivado 2023.2 
-    // $fscanf bug with negative numbers
-    int version = 1;
+    // -------------------------------------------------------------------------
+    // Watchdog
+    //
+    // A correct run is about 6 us of simulated time.  This fires only if
+    // something is genuinely stuck -- most often a clock that never starts, or
+    // a read loop whose terminating condition is never met.
+    //
+    // It ends with $finish, not $fatal.  $fatal leaves xsim.exe and xsimk.exe
+    // alive on Windows, and the build script captures the simulator's output --
+    // so it waits on a pipe that never closes, and a run that should fail in a
+    // second takes ten minutes to do it.  $finish exits cleanly.
+    //
+    // Exiting cleanly means the build script sees a *successful* simulation
+    // that wrote a short CSV, which is why compare_hardware() in cubic_build.py
+    // scores a row-count mismatch rather than assuming the run must have
+    // crashed.  The two go together: change one and read the other.
+    // -------------------------------------------------------------------------
+    initial begin
+        #500_000;
+        $display("TIMEOUT: still running after 500 us of simulated time.");
+        $display("         No result was recorded for the remaining cases.");
+        $fclose(out_file_handle);
+        $fclose(file_handle);
+        $finish;
+    end
 
     initial begin
-        // Initialize
-        rst = 0;
-        x = 0;
-        a0 = 0;
-        a1 = 0;
-        a2 = 0;
-        num_passed = 0;
-        num_failed = 0;
-        num_tests = 0;
+        rst         = 1;
+        x           = 0;
+        a0          = 0;
+        a1          = 0;
+        a2          = 0;
+        num_passed  = 0;
+        num_failed  = 0;
+        num_unknown = 0;
 
-        // Assert reset for one clock cycle
-        rst = 0;
-        @(posedge clk);
-        @(posedge clk)
-        rst = 1;
-        @(posedge clk);
+        if (!$value$plusargs("vecdir=%s", vecdir)) vecdir = "vectors";
+        fn     = {vecdir, "/cubic_py.csv"};
+        fn_out = {vecdir, "/cubic_sv.csv"};
+
+        // Reset both instances.
+        repeat (3) @(posedge clk);
         rst = 0;
 
-        // Construct filenames
-        // Note that we use relative path assuming running from demos/fixp/sim
-        fn = $sformatf("../test_outputs/tv_w%0d_f%0d.csv", WID, FBITS);
-        fn_out = $sformatf("../test_outputs/tv_w%0d_f%0d_sv.csv", WID, FBITS);
-
-        // Open input CSV file
         file_handle = $fopen(fn, "r");
         if (file_handle == 0) begin
-            $display("ERROR: Could not open input file %s", fn);
-            $display("Please run the Python notebook to generate test vectors first.");
+            $display("FATAL: could not open %s", fn);
+            $display("       Run the Python stage first:  python cubic_build.py --through pysim");
             $finish;
         end
 
-        // Open output CSV file
         out_file_handle = $fopen(fn_out, "w");
         if (out_file_handle == 0) begin
-            $display("ERROR: Could not open output file %s", fn_out);
+            $display("FATAL: could not open %s for writing", fn_out);
             $fclose(file_handle);
             $finish;
         end
 
-        $display("=== Cubic Fixed Point Testbench ===");
-        $display("Parameters: WID=%0d, FBITS=%0d", WID, FBITS);
-        $display("Reading test vectors from: %s", fn);
-        $display("Writing results to: %s", fn_out);
+        // Header.  The build script reads these columns by name.
+        $fdisplay(out_file_handle, "fbits,xint,aint0,aint1,aint2,yint,y_dut");
 
-        // Read and skip header line from input
+        // Skip the input header line.
         scan_result = $fgets(header_line, file_handle);
-        $display("CSV Header: %s", header_line);
-        
-        // Write header to output file
-        $fdisplay(out_file_handle, "xint,aint0,aint1,aint2,y,yint,yfix,y_dut");
 
-        // Wait for a few clock cycles before starting
-        repeat (3) @(posedge clk);
+        $display("tb_cubic: reading %s", fn);
+        $display("          writing %s", fn_out);
+        $display("   row  F   xint  aint0  aint1  aint2     yint    y_dut");
 
         line_num = 0;
- 
-        // Read test vectors from CSV file
-        while (!$feof(file_handle)) begin
-            if (version == 0) begin
-                // Original fscanf format (decimal, signed)
-                // Note: This does not work in Vivado 2023.2 due to a bug in $fscanf when reading negative numbers.
-                // Read CSV line: xint,aint0,aint1,aint2,y,yint,yfix
-                scan_result = $fscanf(file_handle, "%d,%d,%d,%d,%f,%d,%f\n", 
-                                xint, aint0, aint1, aint2, y_float, yint_expected, yfix_expected);
 
-            end else begin
-                // Here we read the values one at a time to avoid the Vivado 2023.2 $fscanf 
-                // bug with multiple negative numbers. 
-                // https://adaptivesupport.amd.com/s/question/0D54U000080bmlESAQ/sscanf-and-fscanf-broken-in-vivado-20232-when-parsing-negative-numbers?language=en_US  
-                scan_result  = $fscanf(file_handle, "%d,", xint);
-                scan_result += $fscanf(file_handle, "%d,", aint0);
-                scan_result += $fscanf(file_handle, "%d,", aint1);
-                scan_result += $fscanf(file_handle, "%d,", aint2);
-                scan_result += $fscanf(file_handle, "%f,", y_float);
-                scan_result += $fscanf(file_handle, "%d,", yint_expected);
-                scan_result += $fscanf(file_handle, "%f\n", yfix_expected);
-            end
-            if (scan_result != 7) begin
-                // End of file or incomplete line
+        while (!$feof(file_handle)) begin
+
+            // The columns are fbits,xint,aint0,aint1,aint2,yint,y,yfix -- written
+            // by PySimStep in cubic_build.py.  Only the six integers are read
+            // here; the two floating-point columns are for the Python side and
+            // are swallowed by the $fgets below.
+            //
+            // The fields are read one at a time rather than with a single
+            // format string, to avoid a Vivado 2023.2 bug in $fscanf when a
+            // format contains several negative numbers:
+            // https://adaptivesupport.amd.com/s/question/0D54U000080bmlESAQ/
+            scan_result  = $fscanf(file_handle, "%d,", fbits_test);
+            scan_result += $fscanf(file_handle, "%d,", xint);
+            scan_result += $fscanf(file_handle, "%d,", aint0);
+            scan_result += $fscanf(file_handle, "%d,", aint1);
+            scan_result += $fscanf(file_handle, "%d,", aint2);
+            scan_result += $fscanf(file_handle, "%d,", yint_expected);
+
+            if (scan_result != 6) begin
+                // End of file, or an incomplete final line.
                 break;
             end
-            
+
+            // Swallow the y and yfix columns and the newline.
+            scan_result = $fgets(rest_of_line, file_handle);
+
             line_num++;
-            num_tests++;
-            
-            // Drive inputs
-            #(0.1*CLK_PERIOD);  // Small delay before changing inputs
+
+            // Drive both instances.  A small delay off the clock edge keeps the
+            // inputs away from the setup window of the edge being waited on.
+            #(0.1*CLK_PERIOD);
             x  = xint;
             a0 = aint0;
             a1 = aint1;
             a2 = aint2;
-            
-            // Wait for output 
-            repeat (3) @(posedge clk); 
- 
-            // Check result - compare DUT output with expected fixed-point output
-            if (y == yint_expected) begin
-                num_passed++;
-            end else begin
-                num_failed++;
-                $display("Line %0d FAILED: x=%0d, a0=%0d, a1=%0d, a2=%0d", 
-                         line_num, xint, aint0, aint1, aint2);
-                $display("  Expected: %0d (%.6f), Got: %0d", 
-                         yint_expected, yfix_expected, y);
+
+            repeat (PIPE_WAIT) @(posedge clk);
+
+            // Take the output of the instance this row belongs to.
+            if (fbits_test == FBITS_SMALL)
+                y_dut = y_small;
+            else if (fbits_test == FBITS_LARGE)
+                y_dut = y_large;
+            else begin
+                // The file asked for a setting no instance was built for.  The
+                // row is still written, so the build script sees the right
+                // number of rows and reports a mismatch rather than a truncated
+                // file.
+                y_dut = 'x;
+                num_unknown++;
             end
-            
-            // Write result to output CSV file
-            // Include all input values, expected outputs, and DUT output
-            $fdisplay(out_file_handle, "%0d,%0d,%0d,%0d,%f,%0d,%f,%0d",
-                     xint, aint0, aint1, aint2, y_float, yint_expected, yfix_expected, y);
+
+            if (y_dut === yint_expected) num_passed++;
+            else                         num_failed++;
+
+            if (line_num <= SHOW)
+                $display("  %4d %2d %6d %6d %6d %6d %8d %8d",
+                         line_num, fbits_test, xint, aint0, aint1, aint2,
+                         yint_expected, y_dut);
+
+            $fdisplay(out_file_handle, "%0d,%0d,%0d,%0d,%0d,%0d,%0d",
+                      fbits_test, xint, aint0, aint1, aint2, yint_expected, y_dut);
         end
 
         $fclose(file_handle);
         $fclose(out_file_handle);
 
-        // Print summary
         $display("\n=== Test Summary ===");
-        $display("Total tests: %0d", num_tests);
-        $display("Passed: %0d", num_passed);
-        $display("Failed: %0d", num_failed);
-        if (num_failed == 0) begin
-            $display("*** ALL TESTS PASSED ***");
-        end else begin
-            $display("*** SOME TESTS FAILED ***");
-        end
-        $display("Test results stored in %s", fn_out);
+        $display("Total cases: %0d", line_num);
+        $display("Matched:     %0d", num_passed);
+        $display("Differed:    %0d", num_failed);
+        if (num_unknown > 0)
+            $display("Unknown F:   %0d  (a row asked for a setting with no instance)",
+                     num_unknown);
+        $display("Results written to %s", fn_out);
 
-        // Wait a few cycles and finish
-        repeat (5) @(posedge clk);
+        #20;
         $finish;
     end
 
