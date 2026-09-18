@@ -126,9 +126,9 @@ for that unit; the demo/lab rows are the runnable material.
 ## Labs
 | File | refs | category | status | integration notes |
 |---|---|---|---|---|
-| [labs/cubic/partial/cubic.ipynb](../labs/cubic/partial/cubic.ipynb) | x:1 | dead-xilinxutils | todo | |
-| [docs/labs/cubic/sim_sing.md](../docs/labs/cubic/sim_sing.md) | x:2 | dead-xilinxutils | todo | |
-| [docs/labs/cubic/test.md](../docs/labs/cubic/test.md) | x:2 | dead-xilinxutils | todo | |
+| labs/cubic/partial/cubic.ipynb | x:1 | dead-xilinxutils | **deleted** | ✅ 2026-09-17 — the whole `cubic` lab was rebuilt on labkit + the build DAG, in the same shape as `subc` and `prng`. The notebook is gone: the Python half is now `cubic_model.py` + `cubic_eval.py`, and the student tree is generated from the annotated solution rather than hand-maintained. The import moved to `waveflow.utils.fixputils` (`truncate`/`saturate`, same signatures — the `Format` API would hide the manual `>>fbits` scaling the lab teaches, as in `demos/fixp`). The `sv_sim --source ... --tb ...` invocations the doc references lived in are retired: students run `python cubic_build.py --through svsim`, and `--through svsing` for the single-case bench. `docs/labs/cubic/test.md` was folded into `sv.md` and deleted. Lab is now free of xilinxutils. |
+| [docs/labs/cubic/sim_sing.md](../docs/labs/cubic/sim_sing.md) | x:2 | dead-xilinxutils | **integrated** | Same rebuild as the row above. |
+| docs/labs/cubic/test.md | x:2 | dead-xilinxutils | **deleted** | Folded into `docs/labs/cubic/sv.md` by the same rebuild. |
 | [labs/intersect/partial/line_inter.ipynb](../labs/intersect/partial/line_inter.ipynb) | p:6 | live-pysilicon | todo | |
 | [labs/intersect/run_hls.tcl](../labs/intersect/run_hls.tcl) | p:3 | live-pysilicon | todo | TCL include paths |
 | [docs/labs/intersect/csynth.md](../docs/labs/intersect/csynth.md) | p:1 | live-pysilicon | todo | |
