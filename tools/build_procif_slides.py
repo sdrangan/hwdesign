@@ -1,4 +1,4 @@
-"""Rebuild unit 4's slide deck: procif.pptx -> procif_v3.pptx.
+"""Rebuild unit 4's slide deck: procif.pptx -> procif_v4.pptx.
 
 WHAT THIS IS, AND WHAT IT IS NOT
 --------------------------------
@@ -41,7 +41,7 @@ USAGE
 -----
     python tools/build_procif_slides.py \
         --src units/unit04_procif/procif.pptx \
-        --out units/unit04_procif/procif_v3.pptx
+        --out units/unit04_procif/procif_v4.pptx
 
 Validate and render the result (PowerPoint renders fonts and equations exactly
 as they will appear in class):
@@ -62,10 +62,15 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 def _find_skill_scripts():
-    """Locate the pptx skill's scripts/ directory under ~/.claude/skills."""
-    roots = sorted(Path.home().glob("**/skills/**/pptx/scripts"))
+    """Locate the pptx skill's scripts/ directory.
+
+    Scoped to ~/.claude/skills deliberately: globbing the whole home directory
+    takes minutes on a large profile and looks like a hang.
+    """
+    roots = sorted((Path.home() / ".claude" / "skills").glob("**/pptx/scripts"))
     if not roots:
-        raise SystemExit("pptx skill scripts not found; pass --skill-scripts")
+        raise SystemExit(
+            "pptx skill scripts not found under ~/.claude/skills; pass --skill-scripts")
     return roots[0]
 
 
@@ -75,7 +80,7 @@ def _parse_args():
     here = Path(__file__).resolve().parent.parent
     p.add_argument("--src", type=Path, default=here / "units/unit04_procif/procif.pptx",
                    help="the pre-migration deck to read")
-    p.add_argument("--out", type=Path, default=here / "units/unit04_procif/procif_v3.pptx",
+    p.add_argument("--out", type=Path, default=here / "units/unit04_procif/procif_v4.pptx",
                    help="the deck to write")
     p.add_argument("--work", type=Path, default=Path(tempfile.gettempdir()) / "procif_build",
                    help="scratch directory for the unpacked package")
@@ -106,6 +111,7 @@ AMBERTINT = "FCEEE3"
 TEXT = "262626"
 MUTED = "6E6E6E"
 GRAYFILL = "EDEDED"
+GRAYLINE = "BFBFBF"
 WHITE = "FFFFFF"
 SLATE = "2F6FA8"       # address and control paths in the diagrams
 SLATETINT = "EAF0F7"
@@ -399,8 +405,24 @@ def field_bar(ids, x, y, h, parts):
     return out
 
 
+def arrow(ids, x1, y1, x2, y2, color, lw=1.25, head=True):
+    """A straight connector.  A connector's box is always drawn left-to-right
+    and top-to-bottom, so a leftward or upward arrow is the same box flipped."""
+    i = ids()
+    x, y = min(x1, x2), min(y1, y2)
+    w, h = abs(x2 - x1), abs(y2 - y1)
+    flip = (' flipH="1"' if x2 < x1 else "") + (' flipV="1"' if y2 < y1 else "")
+    tail = '<a:tailEnd type="triangle" w="med" len="med"/>' if head else ""
+    return (f'<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="{i}" name="Connector {i}"/><p:cNvCxnSpPr/>'
+            f"<p:nvPr/></p:nvCxnSpPr>"
+            f'<p:spPr><a:xfrm{flip}><a:off x="{E(x)}" y="{E(y)}"/><a:ext cx="{E(w)}" cy="{E(h)}"/>'
+            f'</a:xfrm><a:prstGeom prst="straightConnector1"><a:avLst/></a:prstGeom>'
+            f'<a:ln w="{int(lw * 12700)}"><a:solidFill><a:srgbClr val="{color}"/></a:solidFill>'
+            f"{tail}</a:ln></p:spPr></p:cxnSp>")
+
+
 def pill(ids, kind):
-    fill = VIOLET if kind == "PRACTICE" else TEAL
+    fill = TEAL if kind == "SOLUTION" else VIOLET
     return shape(ids, 10.55, 0.68, 1.6, 0.42, fill=fill, prst="roundRect", adj=50000,
                  paras=[para(kind, sz=13, color=WHITE, b=True, align="ctr")])
 
@@ -766,6 +788,226 @@ def s_onchip(ids):
             sldnum_ph(ids)]
 
 
+# ====================================================== redrawn figures ====
+#
+# The hand-drawn figures are replaced with ones built from the same helpers as
+# the new slides, so the whole section shares a vocabulary: violet for storage,
+# slate blue for address and control, teal for data, a selected row in solid
+# violet.  Each function returns the shapes for one slide's figure; the slide's
+# title and body text are left alone.
+
+def cell_stack(ids, x, y, w, h, labels, fill=TINT, sz=13, selected=None, gap=0.0):
+    """A column of memory cells, optionally with one row highlighted."""
+    out = []
+    for k, lab in enumerate(labels):
+        on = selected == k
+        out.append(shape(ids, x, y + k * (h + gap), w, h,
+                         fill=VIOLET if on else fill, line=TINT2, lw=0.75,
+                         paras=[para(lab, sz=sz, color=WHITE if on else DEEP, align="ctr")]))
+    return out
+
+
+def fig_addressable_memory(ids):
+    rows = [["Byte address", "Data"],
+            ["`0`", "Word 0"], ["`4`", "Word 1"], ["`8`", "Word 2"],
+            ["⋮", "⋮"], ["`4(𝑁−1)`", "Word $𝑁−1$"]]
+    return [table(ids, 8.05, 2.15, [1.6, 2.5], rows, rowh=0.44, sz=14),
+            label(ids, 8.05, 5.0, 4.1, 0.3, "A 32-bit memory, $𝑁$ words deep", align="ctr")]
+
+
+def fig_ram_architecture(ids):
+    # Everything stays left of x = 7.5: the body text of this slide is the
+    # right-hand column.
+    top, ch, n = 2.5, 0.56, 5
+    sh = [textbox(ids, 1.2, 3.4, 1.45, 0.8,
+                  [para("Address input", sz=13, color=SLATE, b=True, align="ctr"),
+                   para("log₂($𝑁$) bits", sz=12, color=MUTED, align="ctr")]),
+          arrow(ids, 2.6, 3.8, 3.0, 3.8, SLATE),
+          shape(ids, 3.0, 3.35, 1.25, 0.9, fill=SLATETINT, line=SLATELINE,
+                paras=[para("Address", sz=13, color=SLATE, b=True, align="ctr"),
+                       para("decoder", sz=13, color=SLATE, b=True, align="ctr")]),
+          label(ids, 4.5, 2.05, 1.9, 0.3, "$𝑁$ data words", sz=13, align="ctr"),
+          label(ids, 6.3, 2.05, 1.2, 0.3, "Data bus", sz=13, color=TEAL, align="ctr")]
+    sh += cell_stack(ids, 4.5, top, 1.9, ch, ["", "", "selected word", "", ""], selected=2, sz=12)
+    sh.append(shape(ids, 6.6, top, 0.6, n * ch, fill=TEALTINT, line=TEALLINE))
+    for k in range(n):
+        y = top + ch / 2 + k * ch
+        sh.append(arrow(ids, 4.3, y, 4.45, y, SLATE, lw=1.0))            # wordline select
+        sh.append(arrow(ids, 6.65, y, 6.45, y, TEAL, lw=1.0, head=False))
+    sh += [label(ids, 4.5, top + n * ch + 0.12, 1.9, 0.3, "one row per word", sz=12, align="ctr"),
+           label(ids, 6.3, top + n * ch + 0.12, 1.2, 0.3, "R/W", sz=12, color=TEXT, align="ctr")]
+    return sh
+
+
+def bus_with_units(ids, bx, by, bh, unit_x, unit_w, units, label_y):
+    """A vertical bus bar with boxes hanging off it."""
+    out = [shape(ids, bx, by, 0.4, bh, fill=VIOLET),
+           label(ids, bx - 0.35, label_y, 1.1, 0.3, "Bus", sz=14, color=VIOLET, b=True, align="ctr")]
+    for k, name in enumerate(units):
+        y = by + 0.25 + k * ((bh - 0.9) / max(len(units) - 1, 1))
+        out.append(shape(ids, unit_x, y, unit_w, 0.62, fill=TINT, line=TINT2,
+                         paras=[para(name, sz=14, color=DEEP, align="ctr")]))
+        out.append(arrow(ids, bx + 0.4, y + 0.31, unit_x, y + 0.31, TEAL, lw=1.25))
+    return out
+
+
+def fig_bus(ids):
+    return bus_with_units(ids, 8.9, 2.3, 3.3, 10.2, 1.9, ["Unit A", "Unit B", "Unit C"], 1.9) + [
+        label(ids, 8.3, 5.85, 4.0, 0.3, "One unit drives the bus at a time", sz=12, align="ctr")]
+
+
+def fig_high_z(ids):
+    # Kept right of x = 10.3: the tri-state table on this slide renders wider
+    # than its stored width, and reaches about 9.7 inches.
+    return bus_with_units(ids, 10.4, 2.2, 2.4, 11.3, 0.95, ["A", "B", "C"], 1.82)
+
+
+def fig_high_z_data_bus(ids):
+    sh = [label(ids, 1.6, 1.95, 1.9, 0.3, "$𝑁$ data words", sz=13, align="ctr"),
+          label(ids, 3.75, 1.95, 1.05, 0.3, "Data bus", sz=13, color=TEAL, align="ctr")]
+    sh += cell_stack(ids, 1.6, 2.35, 1.9, 0.45, ["", "", "drives the bus", "", ""], selected=2, sz=12)
+    sh.append(shape(ids, 3.95, 2.35, 0.65, 2.25, fill=TEALTINT, line=TEALLINE))
+    for k in range(5):
+        y = 2.55 + k * 0.45
+        sh.append(arrow(ids, 3.55, y, 3.9, y, TEAL if k == 2 else GRAYLINE, lw=1.25, head=(k == 2)))
+    sh += [label(ids, 1.6, 4.7, 1.9, 0.3, "others go to $𝑍$", sz=12, align="ctr"),
+           label(ids, 3.75, 4.7, 1.05, 0.3, "R/W", sz=12, color=TEXT, align="ctr")]
+    return sh
+
+
+def s_external_internal(ids):
+    """Rebuilt whole: this slide's content was all loose text boxes."""
+    return [title_ph(ids, "External vs. Internal Memory"),
+            shape(ids, 1.4, 2.5, 2.9, 1.5, fill=TINT, line=TINT2,
+                  paras=[para("External memory", sz=16, color=DEEP, b=True, align="ctr"),
+                         para("DRAM", sz=12, color=MUTED, align="ctr")]),
+            textbox(ids, 1.4, 4.2, 2.9, 1.5, [
+                bullet_item("Off-chip", 14),
+                bullet_item("High capacity (GB)", 14),
+                bullet_item("Reached over an I/O interface", 14)]),
+            arrow(ids, 4.5, 3.25, 5.9, 3.25, SLATE, lw=2.0),
+            label(ids, 4.4, 2.85, 1.6, 0.3, "I/O", sz=13, color=SLATE, b=True, align="ctr"),
+            shape(ids, 6.0, 2.1, 5.3, 2.35, fill="FBFAFC", line=TINT2,
+                  paras=[para("", sz=10)], anchor="t"),
+            label(ids, 6.15, 2.2, 2.0, 0.3, "One chip", sz=12),
+            shape(ids, 6.35, 2.65, 2.2, 1.5, fill=SLATETINT, line=SLATELINE,
+                  paras=[para("Internal memory", sz=15, color=SLATE, b=True, align="ctr"),
+                         para("SRAM, BRAM", sz=12, color=MUTED, align="ctr")]),
+            shape(ids, 8.85, 2.65, 2.2, 1.5, fill=TEALTINT, line=TEALLINE,
+                  paras=[para("Processing", sz=15, color=TEAL, b=True, align="ctr"),
+                         para("hardware", sz=15, color=TEAL, b=True, align="ctr")]),
+            arrow(ids, 8.6, 3.4, 8.8, 3.4, TEAL, lw=2.0),
+            textbox(ids, 6.35, 4.6, 4.7, 1.5, [
+                bullet_item("On-chip", 14),
+                bullet_item("Low capacity (KB–MB)", 14),
+                bullet_item("Direct, low-latency access from the datapath", 14)]),
+            sldnum_ph(ids)]
+
+
+def s_registers_vs_bulk(ids):
+    """Replaces 'Registers vs. Block Memory': the choice is per value, and the
+    criterion is stated rather than implied."""
+    reg = [para("**Registers**", sz=19, align="ctr", spcAft=6),
+           bullet_item("Parallel access: many values in the same cycle", 14),
+           bullet_item("Any register value is available to the datapath", 14),
+           bullet_item("Higher area per bit", 14),
+           bullet_item("A host reads and writes them one at a time", 14)]
+    bulk = [para("**Bulk storage**", sz=19, align="ctr", spcAft=6),
+            bullet_item("Typically one word per access", 14),
+            bullet_item("Much higher density", 14),
+            bullet_item("A host moves data to and from it in bulk", 14),
+            bullet_item("Block RAM on chip, DRAM off chip", 14)]
+    return [title_ph(ids, "Registers vs. Bulk Storage"),
+            label(ids, 1.2, 1.78, 11.0, 0.35,
+                  "Every IP holds a mix. The choice is made per value, not per design.",
+                  sz=17, color=TEXT),
+            shape(ids, 1.2, 2.3, 5.3, 2.75, fill=TINT, line=TINT2, prst="roundRect", adj=6000,
+                  anchor="t", inset=0.18, paras=reg),
+            shape(ids, 6.9, 2.3, 5.3, 2.75, fill=SLATETINT, line=SLATELINE, prst="roundRect",
+                  adj=6000, anchor="t", inset=0.18, paras=bulk),
+            shape(ids, 1.2, 5.35, 11.0, 0.8, fill=BAND, line=TINT2, prst="roundRect", adj=20000,
+                  paras=[para("A few values needed at once → **registers**.     "
+                              "Thousands touched one at a time → **bulk storage**.",
+                              sz=17, color=TEXT, align="ctr")]),
+            sldnum_ph(ids)]
+
+
+def fig_memory_mapped(ids):
+    sh = [shape(ids, 7.9, 2.2, 0.4, 3.3, fill=TEALTINT, line=TEALLINE),
+          label(ids, 7.35, 1.85, 1.5, 0.3, "Data bus", sz=12, color=TEAL, align="ctr"),
+          shape(ids, 8.95, 2.2, 0.4, 3.3, fill=SLATETINT, line=SLATELINE),
+          label(ids, 8.55, 1.85, 1.8, 0.3, "Address bus", sz=12, color=SLATE, align="ctr")]
+    for y, name, fill, line, colour in ((2.45, "Registers", SLATETINT, SLATELINE, SLATE),
+                                        (4.15, "Block memory", TINT, TINT2, VIOLET)):
+        sh += [shape(ids, 9.75, y + 0.1, 0.95, 0.6, fill=SLATETINT, line=SLATELINE,
+                     paras=[para("decoder", sz=11, color=SLATE, align="ctr")]),
+               arrow(ids, 9.35, y + 0.4, 9.7, y + 0.4, SLATE, lw=1.25),
+               arrow(ids, 10.7, y + 0.4, 11.0, y + 0.4, SLATE, lw=1.25),
+               arrow(ids, 8.3, y + 1.05, 11.0, y + 1.05, TEAL, lw=1.25, head=False),
+               label(ids, 11.0, y - 0.3, 1.3, 0.3, name, sz=13, color=colour, b=True, align="ctr")]
+        sh += cell_stack(ids, 11.0, y, 1.2, 0.3, ["", "", ""], fill=fill, sz=10)
+    return sh
+
+
+def fig_cubic_ip(ids):
+    sh = [label(ids, 10.3, 1.85, 1.8, 0.3, "Registers", sz=13, color=SLATE, b=True, align="ctr")]
+    sh += cell_stack(ids, 10.3, 2.2, 1.8, 0.4,
+                     ["$𝑎[0]$", "$𝑎[1]$", "$𝑎[2]$", "$𝑎[3]$"], fill=SLATETINT, sz=13)
+    for x, name in ((8.7, "𝑥"), (10.5, "𝑦")):
+        sh += cell_stack(ids, x, 4.3, 1.6, 0.4,
+                         [f"${name}[0]$", f"${name}[1]$", "⋮", f"${name}[𝑛−1]$"], sz=13)
+    sh.append(label(ids, 8.7, 6.0, 3.4, 0.3, "Block memory", sz=13, color=VIOLET, b=True, align="ctr"))
+    return sh
+
+
+def s_inclass_exercise(ids):
+    return [title_ph(ids, "Where Does Each Value Live?"), pill(ids, "IN CLASS"),
+            textbox(ids, 1.2, 1.8, 6.9, 4.4, [
+                para("Pick a computation that interests you: filtering in video processing, "
+                     "encryption, a neural-network layer, a matrix product. It must take at "
+                     "least one array, image or stream.", sz=17, color=TEXT, spcAft=6),
+                part("(a)", "List the inputs and outputs, with a size or a rate for each.", 17),
+                part("(b)", "Which would you hold in **registers**? Why?", 17),
+                part("(c)", "Which would you hold in **bulk storage**? Why?", 17),
+                part("(d)", "Choose a problem size. Give the register map, and the size of the "
+                            "bulk storage in words.", 17)]),
+            shape(ids, 8.4, 1.85, 3.8, 1.75, fill=TINT, prst="roundRect", adj=8000, anchor="t",
+                  inset=0.16, paras=[
+                      para("**Decide per value**", sz=15, spcAft=6),
+                      para("Registers: parallel access, available to the datapath, higher area "
+                           "per bit", sz=13, color=TEXT, spcAft=5),
+                      para("Bulk storage: one word per access, much higher density", sz=13,
+                           color=TEXT)]),
+            label(ids, 8.4, 3.85, 3.8, 0.9,
+                  "How the data crosses into the IP is the next section, and units 5 and 9.",
+                  sz=12),
+            portal_caption(ids, "Storage partitioning"), sldnum_ph(ids)]
+
+
+FIGURES = {
+    "slide4.xml": fig_addressable_memory,
+    "slide6.xml": fig_ram_architecture,
+    "slide7.xml": fig_bus,
+    "slide8.xml": fig_high_z,
+    "slide9.xml": fig_high_z_data_bus,
+    "slide15.xml": fig_memory_mapped,
+    "slide16.xml": fig_cubic_ip,
+}
+
+
+def redraw_figure(slide, fn):
+    """Drop the hand-drawn shapes and connectors, keep placeholders, tables and
+    pictures, then add the new figure."""
+    p = SLIDES / slide
+    t = p.read_text(encoding="utf-8")
+    t, n_sp = re.subn(r"<p:sp>(?:(?!</p:sp>).)*?</p:sp>",
+                      lambda m: "" if "<p:ph" not in m.group(0) else m.group(0), t, flags=re.S)
+    t, n_cx = re.subn(r"<p:cxnSp>.*?</p:cxnSp>", "", t, flags=re.S)
+    t = t.replace("</p:spTree>", "".join(fn(Ids())) + "</p:spTree>")
+    p.write_text(t, encoding="utf-8")
+    return n_sp, n_cx
+
+
 # ================================================================ passes ====
 def sh(cmd, cwd=None):
     r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -787,6 +1029,15 @@ def fix(slide, old, new):
     t = p.read_text(encoding="utf-8")
     n = t.count(old)
     assert n == 1, f"{slide}: expected 1 of {old!r}, found {n}"
+    p.write_text(t.replace(old, new), encoding="utf-8")
+
+
+def fix_all(slide, old, new):
+    """Slides carrying equations store the body twice, as the math version and
+    a fallback copy, so body text has to be replaced in both."""
+    p = SLIDES / slide
+    t = p.read_text(encoding="utf-8")
+    assert old in t, f"{slide}: {old!r} not found"
     p.write_text(t.replace(old, new), encoding="utf-8")
 
 
@@ -918,13 +1169,17 @@ def main():
     n7 = add_after("slide3.xml", "slide16.xml")
     n8 = add_after("slide3.xml", n7)
     n9 = add_after("slide3.xml", n8)
-    print("new slides:", n1, n2, n3, n4, n5, n6, n7, n8, n9)
+    n10 = add_after("slide3.xml", n9)          # the in-class exercise closes section 1
+    print("new slides:", n1, n2, n3, n4, n5, n6, n7, n8, n9, n10)
 
     # 2. content
     for slide, fn in ((n1, s_byte_word), (n2, s_byte_word_practice), (n3, s_byte_word_solution),
                       (n4, s_address_map), (n5, s_global_practice), (n6, s_global_solution),
                       (n7, s_register_maps), (n8, s_register_practice), (n9, s_register_solution),
-                      ("slide2.xml", s_objectives), ("slide12.xml", s_onchip), ("slide13.xml", s_video)):
+                      (n10, s_inclass_exercise),
+                      ("slide2.xml", s_objectives), ("slide10.xml", s_external_internal),
+                      ("slide12.xml", s_onchip), ("slide13.xml", s_video),
+                      ("slide14.xml", s_registers_vs_bulk)):
         write(slide, fn(Ids()))
 
     # Slide 11: swap the screenshot of a table for a real one, keeping the
@@ -953,6 +1208,11 @@ def main():
         total += recolour_diagrams(s)
     print(f"diagram colours remapped: {total}")
 
+    # 3c. redraw the hand-drawn figures in the same vocabulary as the new slides
+    for s, fn in FIGURES.items():
+        n_sp, n_cx = redraw_figure(s, fn)
+        print(f"redraw {s}: dropped {n_sp} shapes, {n_cx} connectors")
+
     # 4. text fixes
     fix("slide4.xml", "Each of the data element", "Each data element")
     fix("slide7.xml", " so only unit drives the bus", " so only one unit drives the bus")
@@ -967,6 +1227,19 @@ def main():
     p8.write_text(t8, encoding="utf-8")
     # The register-map practice problem says "the cubic IP from lecture"; name the slide it means.
     fix("slide16.xml", "<a:t>Example</a:t>", "<a:t>Example: The Cubic IP</a:t>")
+
+    # Storage type and exposure are separate things, and this slide is about
+    # exposure: it maps registers *and* block memory into one address space.
+    fix_all("slide15.xml", "Memory Mapped Registers", "Memory-Mapped Storage")
+    # "&" is stored escaped in the slide XML.
+    fix_all("slide15.xml", "Processor sees registers &amp; block memory together",
+            "Processor sees registers and block memory in one address space")
+    fix_all("slide15.xml", "One continuous address space",
+            "Being addressable is independent of what the storage is made of")
+
+    # Say why each value sits where it does, rather than only where.
+    fix_all("slide16.xml", "Small, individual pieces", "Four values, all needed in the same cycle")
+    fix_all("slide16.xml", "Ideal for large vectors", "n values, only one touched per cycle")
     fix("slide17.xml", "Processor Interfaces with AXI-Lite", "Processor Interfaces with AXI4-Lite")
     fix("slide17.xml", "Implementing AXI-Lite Interface in Vitis<", "Implementing AXI4-Lite Interface in Vitis HLS<")
 
