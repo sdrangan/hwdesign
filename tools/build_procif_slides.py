@@ -88,6 +88,8 @@ def _parse_args():
                    help="scratch directory for the unpacked package")
     p.add_argument("--skill-scripts", type=Path, default=None,
                    help="the pptx skill's scripts/ directory")
+    p.add_argument("--force", action="store_true",
+                   help="run even if the source deck looks already migrated")
     a = p.parse_args()
     a.skill_scripts = a.skill_scripts or _find_skill_scripts()
     return a
@@ -1287,7 +1289,30 @@ def pack():
                 z.write(f, f.relative_to(BUILD).as_posix())
 
 
+MIGRATED_MARKER = "Byte vs. Word Addressing"   # a slide only this script adds
+
+
+def refuse_if_migrated():
+    """Stop if the source deck is already this script's own output.
+
+    The revised deck has been renamed over procif.pptx, so the default source
+    is now a migrated deck: running again would insert every new slide a second
+    time.  Check before doing any work, not after.
+    """
+    with zipfile.ZipFile(SRC) as z:
+        for name in z.namelist():
+            if re.match(r"ppt/slides/slide\d+\.xml$", name):
+                if MIGRATED_MARKER in z.read(name).decode("utf-8", "ignore"):
+                    raise SystemExit(
+                        f"{SRC.name} already contains a slide titled {MIGRATED_MARKER!r}, so it "
+                        "has been through this script. Re-running would duplicate the new "
+                        "slides.\nThis is a one-shot migration: see the module docstring. Use an "
+                        "unmigrated deck with --src, or --force if you are sure.")
+
+
 def main():
+    if not ARGS.force:
+        refuse_if_migrated()
     if BUILD.exists():
         shutil.rmtree(BUILD)
     zipfile.ZipFile(SRC).extractall(BUILD)
