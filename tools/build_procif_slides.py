@@ -56,6 +56,8 @@ import sys
 import tempfile
 import zipfile
 from pathlib import Path
+
+from PIL import Image        # only to read a generated figure's aspect ratio
 from xml.sax.saxutils import escape
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -736,7 +738,7 @@ def s_objectives(ids):
             ["Compute memory addresses",
              "Convert between word and byte addresses, split a global address into a local one, "
              "and lay out a register map"],
-            ["Identify bus master and slave",
+            ["Identify bus manager and subordinate",
              "Say which party initiates a transaction, whichever way the data flows"],
             ["Time a valid/ready handshake",
              "Work out the cycle a transfer happens on, including when the receiver is busy"],
@@ -984,6 +986,25 @@ def s_inclass_exercise(ids):
             portal_caption(ids, "Storage partitioning"), sldnum_ph(ids)]
 
 
+def s_timing_exercise(ids):
+    """Closes the write-protocol run: the diagram is on the slide before this."""
+    return [title_ph(ids, "Read the Timing Diagram"), pill(ids, "IN CLASS"),
+            label(ids, 1.2, 1.8, 11.0, 0.4,
+                  "Using the write-with-a-stall diagram on the previous slide:",
+                  sz=18, color=TEXT),
+            textbox(ids, 1.2, 2.45, 10.6, 3.4, [
+                part("(a)", "In which cycle does the address transfer on the AW channel? "
+                            "How do you know?", 18),
+                part("(b)", "In which cycle does the write data transfer on the W channel?", 18),
+                part("(c)", "In which cycle does the write response transfer on the B channel?", 18),
+                part("(d)", "The hatched region marks a wait. Which side is waiting, what is it "
+                            "waiting for, and for how many cycles?", 18)]),
+            shape(ids, 1.2, 5.5, 10.6, 0.7, fill=TINT, prst="roundRect", adj=22000,
+                  paras=[para("A transfer happens on the first cycle where **VALID** and "
+                              "**READY** are both high.", sz=16, color=TEXT, align="ctr")]),
+            portal_caption(ids, "Reading a write timing diagram"), sldnum_ph(ids)]
+
+
 FIGURES = {
     "slide4.xml": fig_addressable_memory,
     "slide6.xml": fig_ram_architecture,
@@ -992,6 +1013,118 @@ FIGURES = {
     "slide9.xml": fig_high_z_data_bus,
     "slide15.xml": fig_memory_mapped,
     "slide16.xml": fig_cubic_ip,
+}
+
+
+ROLE_WORDS = [("MASTER", "MANAGER"), ("SLAVE", "SUBORDINATE"),
+              ("Master", "Manager"), ("Slave", "Subordinate"),
+              ("master", "manager"), ("slave", "subordinate")]
+
+
+def rename_roles(slide):
+    """master/slave -> manager/subordinate, the names AMBA itself now uses.
+
+    Confined to <a:t> runs: shape names and relationship ids must not move.
+    """
+    p = SLIDES / slide
+    t = p.read_text(encoding="utf-8")
+
+    def one(m):
+        s = m.group(1)
+        for old, new in ROLE_WORDS:
+            s = s.replace(old, new)
+        return f"<a:t>{s}</a:t>"
+
+    new_t = re.sub(r"<a:t>(.*?)</a:t>", one, t, flags=re.S)
+    if new_t == t:
+        return 0
+    p.write_text(new_t, encoding="utf-8")
+    return sum(t.count(old) for old, _ in ROLE_WORDS)
+
+
+def widen_role_labels(slide, grow=0.95):
+    """"SUBORDINATE" is twice the width of "SLAVE", so the boxes drawn for the
+    old word wrap it.  Widen those boxes and keep them centred where they were."""
+    p = SLIDES / slide
+    t = p.read_text(encoding="utf-8")
+    n = 0
+
+    def one(m):
+        nonlocal n
+        sp = m.group(0)
+        if "<a:t>SUBORDINATE</a:t>" not in sp:
+            return sp
+        off = re.search(r'<a:off x="(-?\d+)" y="(-?\d+)"/><a:ext cx="(\d+)" cy="(\d+)"/>', sp)
+        if not off:
+            return sp
+        x, y, cx, cy = (int(v) for v in off.groups())
+        n += 1
+        return sp.replace(off.group(0),
+                          f'<a:off x="{x - E(grow) // 2}" y="{y}"/>'
+                          f'<a:ext cx="{cx + E(grow)}" cy="{cy}"/>')
+
+    t2 = re.sub(r"<p:sp>(?:(?!</p:sp>).)*?</p:sp>", one, t, flags=re.S)
+    if n:
+        p.write_text(t2, encoding="utf-8")
+    return n
+
+
+def strip_overlays(slide):
+    """Drop hand-drawn annotations that were aligned to a figure we replaced.
+
+    Keeps placeholders, the picture itself and any table; removes the loose
+    shapes and connectors, which no longer line up (and, on the write slides,
+    no longer say anything true about the corrected timing)."""
+    p = SLIDES / slide
+    t = p.read_text(encoding="utf-8")
+    t, n_sp = re.subn(r"<p:sp>(?:(?!</p:sp>).)*?</p:sp>",
+                      lambda m: "" if "<p:ph" not in m.group(0) else m.group(0), t, flags=re.S)
+    t, n_cx = re.subn(r"<p:cxnSp>.*?</p:cxnSp>", "", t, flags=re.S)
+    p.write_text(t, encoding="utf-8")
+    return n_sp, n_cx
+
+
+def _slide_rel_for_image(slide, image_name):
+    rels = (SLIDES / "_rels" / f"{slide}.rels").read_text(encoding="utf-8")
+    m = re.search(rf'<Relationship Id="(rId\d+)"[^>]*Target="[^"]*{re.escape(image_name)}"', rels)
+    return m.group(1) if m else None
+
+
+def replace_figure(slide, image_name, png):
+    """Swap a generated figure into the package and refit its frame.
+
+    The picture keeps its position and width; only the height is recomputed
+    from the new image's aspect, so a figure with a different number of signal
+    rows is not stretched.
+    """
+    media = BUILD / "ppt" / "media" / image_name
+    media.write_bytes(Path(png).read_bytes())
+    rid = _slide_rel_for_image(slide, image_name)
+    assert rid, f"{slide}: no relationship for {image_name}"
+
+    with Image.open(png) as im:
+        aspect = im.width / im.height
+
+    p = SLIDES / slide
+    t = p.read_text(encoding="utf-8")
+    pics = [m for m in re.finditer(r"<p:pic>.*?</p:pic>", t, flags=re.S)
+            if f'r:embed="{rid}"' in m.group(0)]
+    assert len(pics) == 1, f"{slide}: expected 1 picture using {rid}, found {len(pics)}"
+    pic = pics[0].group(0)
+    ext = re.search(r'<a:ext cx="(\d+)" cy="(\d+)"/>', pic)
+    cx = int(ext.group(1))
+    new_pic = pic.replace(ext.group(0), f'<a:ext cx="{cx}" cy="{int(round(cx / aspect))}"/>')
+    p.write_text(t.replace(pic, new_pic), encoding="utf-8")
+    return image_name, f"{int(ext.group(2))} -> {int(round(cx / aspect))}"
+
+
+# Which generated figure replaces which packaged image.  Each of these images
+# is referenced by exactly one slide, so overwriting the bytes is safe; check
+# that again before adding an entry.
+GENERATED_FIGURES = {
+    "slide22.xml": ("image22.png", "axi_write.png"),        # Example AXI4-Lite Write
+    "slide23.xml": ("image24.png", "axi_write_stall.png"),  # ... with a stall
+    "slide27.xml": ("image25.png", "axi_read.png"),         # Example Read Timing
 }
 
 
@@ -1170,13 +1303,14 @@ def main():
     n8 = add_after("slide3.xml", n7)
     n9 = add_after("slide3.xml", n8)
     n10 = add_after("slide3.xml", n9)          # the in-class exercise closes section 1
-    print("new slides:", n1, n2, n3, n4, n5, n6, n7, n8, n9, n10)
+    n11 = add_after("slide3.xml", "slide23.xml")   # after the write-with-a-stall diagram
+    print("new slides:", n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11)
 
     # 2. content
     for slide, fn in ((n1, s_byte_word), (n2, s_byte_word_practice), (n3, s_byte_word_solution),
                       (n4, s_address_map), (n5, s_global_practice), (n6, s_global_solution),
                       (n7, s_register_maps), (n8, s_register_practice), (n9, s_register_solution),
-                      (n10, s_inclass_exercise),
+                      (n10, s_inclass_exercise), (n11, s_timing_exercise),
                       ("slide2.xml", s_objectives), ("slide10.xml", s_external_internal),
                       ("slide12.xml", s_onchip), ("slide13.xml", s_video),
                       ("slide14.xml", s_registers_vs_bulk)):
@@ -1240,6 +1374,20 @@ def main():
     # Say why each value sits where it does, rather than only where.
     fix_all("slide16.xml", "Small, individual pieces", "Four values, all needed in the same cycle")
     fix_all("slide16.xml", "Ideal for large vectors", "n values, only one touched per cycle")
+
+    # 4b. swap in the figures generated by figs/make_figs.py
+    figs_dir = ARGS.src.parent / "figs"
+    for slide, (image_name, png) in GENERATED_FIGURES.items():
+        path = figs_dir / png
+        if not path.exists():
+            print(f"skip {png}: not generated yet (run figs/make_figs.py)")
+            continue
+        # The cycle markers and "Transaction 4 cycles" captions were positioned
+        # against the old image, and the corrected write response no longer
+        # completes in four cycles.
+        strip_overlays(slide)
+        name, change = replace_figure(slide, image_name, path)
+        print(f"figure {png} -> {name}, height {change} EMU")
     fix("slide17.xml", "Processor Interfaces with AXI-Lite", "Processor Interfaces with AXI4-Lite")
     fix("slide17.xml", "Implementing AXI-Lite Interface in Vitis<", "Implementing AXI4-Lite Interface in Vitis HLS<")
 
@@ -1261,6 +1409,19 @@ def main():
         assert old in t21, f"slide21: {old!r} not found"
         t21 = t21.replace(old, new)
     p21.write_text(t21, encoding="utf-8")
+
+    # 4c. AMBA renamed the bus roles in 2021; the course follows the spec.  This
+    # runs after every other text fix, so those can be written in the old words,
+    # and before the note below, so the note's own "master and slave" survives.
+    renamed = sum(rename_roles(f"slide{n}.xml") for n in range(1, 60)
+                  if (SLIDES / f"slide{n}.xml").exists())
+    fix_all("slide20.xml", "Manager-Subordinate and Transactions", "Managers and Subordinates")
+    fix_all("slide20.xml", "In AXI4-Lite:",
+            "Called master and slave until AMBA renamed them in 2021, and the port names "
+            "(S_AXI, s_axilite) still do.   In AXI4-Lite:")
+    widened = sum(widen_role_labels(f"slide{n}.xml") for n in range(1, 60)
+                  if (SLIDES / f"slide{n}.xml").exists())
+    print(f"role words renamed: {renamed}, label boxes widened: {widened}")
 
     # 5. pack
     print(sh([sys.executable, "clean.py", str(BUILD)], cwd=SCRIPTS).strip())
