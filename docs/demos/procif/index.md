@@ -21,6 +21,8 @@ By completing this demo, you will learn how to:
 * View a **register file** for an IP
 * Perform an **RTL‑level simulation** of the generated IP and produce a **Value Change Dump (VCD)** file  
 * Visualize AXI4‑Lite transactions using **timing diagrams**
+* Drive the whole flow from a **build script** rather than by hand, and check
+  each stage against an independent reference model
 
 Additionally, if you want to deploy the IP on a real FPGA board, we will show you how to:
 
@@ -29,7 +31,7 @@ Additionally, if you want to deploy the IP on a real FPGA board, we will show yo
 * Build a **PYNQ overlay** that loads the bitstream onto the FPGA and allows you to interact with the IP from Python
 
 ## Pre-Requirements
-Prior to doing this demo, you will need to follow the [software set-up](../../setup/sw_installation/) for Vitis, Vivado, and Python.  
+Prior to doing this demo, you will need to follow the [software set-up](../../support/amd/) for Vitis, Vivado, and Python.  
 
 ---
 Go to [Building the Vitis IP](./vitis_ip.md).

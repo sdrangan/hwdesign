@@ -1,121 +1,213 @@
 ---
 title: RTL Simulation
 parent: Bus Basics and Memory‑Mapped Interfaces
-nav_order: 3
+nav_order: 5
 has_children: false
 ---
 
-# RIL Simulation of the Synthesized Vitis IP
+# RTL Simulation of the Synthesized Vitis IP
 
-Before adding the Vitis IP to the FPGA project, it is useful to simulate the synthesized RTL.
-This step can be done after C Synthesis and C simulation, but before Packaging.
+C simulation told us the *algorithm* is right. It said nothing about the
+hardware: it ran the C++ on a processor. Synthesis then produced RTL, and
+nothing so far has checked that the RTL still does the same thing.
 
-* If Vitis is not already open from the previous step:
-    * [Launch Vitis](../../setup/sw_installation/)
-    * Open the workspace for the for the Vitis IP that you were using, which should be in `hwdesign/scalar_fun/scalar_fun_vitis`
-* In the **Flow panel** (left sidebar), find the **C/RTL Simulation** section
-* Select the settings (gear box) in the C/RTL Simulation:
-    * Select **cosim.trace.all** to **all** or **port**  This setting will trace all the outputs or the signals at the port level.
-* Next select the **C/RTL Simulation->Run**.  This command will execute a RTL-level simulation of the synthesized IP.
+That check is **C/RTL co-simulation**. Vitis runs the *same* testbench again,
+but the calls to `simp_fun` are served by the synthesized RTL in a simulator
+instead of by the C++ function. It is also the first point where we can see the
+AXI4‑Lite transactions themselves, which is what this unit is really about.
 
-## Extracting VCD Files
+Run everything below from `hwdesign/demos/scalar_fun/scalar_fun_vitis`.
 
-The C/RTL simulation that is run from the Vitis GUI creates a `.wdb` (waveform database)  file with traces of all the signals.
-This format is an AMD proprietary format and cannot be read by other programs,
-although you can see it in the Vivado viewer.  So, we will modify the simulation to export 
-an alternative open-source **VCD** or [**Value Change Dump**](https://en.wikipedia.org/wiki/Value_change_dump) format.  VCD files can be read by many programs including python.
+## Co-simulation
 
-The `xilinxutils` package has a simple python file that modifies the simulation files to capture the VCD output and re-runs the simulation.  You can execute it as follows:
+~~~bash
+(env) python scalar_fun_build.py --through cosim
+~~~
 
-* [Activate the virtual environment](../../support/repo/package.md) with `waveflow` and `hwdesign`
-* Navigate (i.e., `cd`) to the directory of the Vitis IP project.  In the scalar function project, this Vitis project is in `hwdesign\scalar_fun\scalar_fun_vitis`
-* Identify the `component_name` and `top_name`. 
-    * When the IP was synthesized, Vitis created a directory of the form `<component_name>/<top_name>` based on the names of the component and top-level function.  Based on the settings we used in this project, this directory is: 
+This one is slow — a few minutes. Watch the log and you will see the testbench
+run **twice**:
 
-    ```bash
-    scalar_fun_vitis\hls_component\simp_fun
-    ```
-    * Hence, in this example `component_name=hls_component` and `top_name=scalar_fun`
-* Re-run the simulation with VCD with the command from PowerShell or Linux terminal:
+~~~text
+INFO: [COSIM 212-302] Starting C TB testing ...
+Test 0: x=3 w=2 b=4 got 10, expected 10  PASS
+...
+INFO: [COSIM 212-15] Starting XSIM ...
+INFO: [COSIM 212-316] Starting C post checking ...
+Test 0: x=3 w=2 b=4 got 10, expected 10  PASS
+...
+INFO: [COSIM 212-1000] *** C/RTL co-simulation finished: PASS ***
+~~~
 
-```bash
-(env) xsim_vcd --top <top_name> [--comp <component_name>] [--out <vcd_file>]
-```
+The first pass records the inputs your testbench applies. Those recorded
+transactions are replayed into the RTL simulator. The second pass — "C post
+checking" — runs your `main()` again, except now the value that comes back from
+`simp_fun` is the value the *hardware* produced. That is why the results file
+it writes, `results/cosim/results.json`, describes the RTL and not the C++.
 
-where `vcdfile` is the name of the VCD file with the signal traces.  By default, `<vcd_file>` is `dump.vcd`.  In our example, you will run:
+### Under the hood: the build step
 
-```bash
-(env) xsim_vcd --top sim_fun --comp hls_component --out dump.vcd
-```
+~~~python
+@dataclass(kw_only=True)
+class CoSimStep(BuildStep):
+    """Re-run the same testbench against the synthesized RTL."""
 
-    * Note:  We have not yet created a version of the script `xsim_vcd` for Linux.
-    * After running the script, there will be a VCD file with the simulation:
+    description = "Run RTL co-simulation into results/cosim, with tracing on."
+    consumes = ["scalar_fun_tb", "run_tcl", "cases", "report_dir"]
+    produces = {"cosim_dir": Path("results/cosim")}
+    params = {"clk_period_ns": 10.0, "trace_level": "port", "live_output": False}
+~~~
 
-    ```bash
-    scalar_fun_vitis\vcd\<vcd_file>
-    ```
+It consumes `report_dir` — the solution directory that synthesis produced —
+which is what puts it after synthesis in the graph. And it produces
+`results/cosim`, a *different* directory from C simulation's `results/csim`.
+That separation is deliberate: it is what lets the two runs be checked
+independently rather than one overwriting the other's evidence.
+
+Running it by hand:
+
+~~~powershell
+$env:SCALAR_FUN_STAGE       = "cosim"
+$env:SCALAR_FUN_OUT_DIR     = "$PWD/results/cosim"
+$env:SCALAR_FUN_TRACE_LEVEL = "port"
+& "C:/Xilinx/2025.1/Vitis/bin/vitis-run.bat" --mode hls --tcl run.tcl
+~~~
+
+or in the GUI, **C/RTL Simulation → Run**, having first set
+**cosim.trace.all** to `port` or `all` in its settings (the gear icon).
+
+## Verifying the co-simulation
+
+Exactly as after C simulation, we compare against the Python model:
+
+~~~bash
+(env) python scalar_fun_build.py --through verify_cosim
+~~~
+
+This is the check that catches a synthesis-level bug: something the C++ does
+correctly that the generated hardware does not. It is a different question from
+`verify_csim`, which is why both exist.
+
+It is the same `FunctionalVerifyStep` as before, pointed at the other
+directory:
+
+~~~python
+dag.add(FunctionalVerifyStep(
+    name="verify_cosim",
+    golden_dir_artifact="golden_dir",
+    actual_dir_artifact="cosim_dir",
+    jsons=[{"filename": "results.json", "compare_fields": ["y"]}],
+    report_path="results/verify_cosim.json",
+    report_artifact="verify_cosim_report",
+))
+~~~
+
+The golden directory is the same one — the Python model does not care which
+implementation produced the answers it is checking.
+
+## How long did it take?
+
+~~~bash
+(env) python scalar_fun_build.py --through extract_cosim_timing
+~~~
+
+This parses the co-simulation report and writes
+`results/cosim_timing.json` with the measured **transaction cycles** — how many
+clock cycles one call to the IP took, as observed in RTL simulation rather than
+estimated.
+
+## Extracting a VCD file
+
+Co-simulation records the waveforms in a `.wdb` (waveform database) file. That
+is an AMD proprietary format; only the Vivado viewer opens it. We want a
+[**Value Change Dump**](https://en.wikipedia.org/wiki/Value_change_dump), or
+**VCD** — an open format that many programs, including Python, can read.
+
+Getting one means re-running the RTL simulation with VCD logging switched on,
+which in turn means editing the generated simulation scripts. That used to be a
+page of manual instructions. It is now a step:
+
+~~~bash
+(env) python scalar_fun_build.py --through extract_vcd
+~~~
+
+~~~text
+VCD copied to ...\scalar_fun_vitis\vcd\dump.vcd
+VCD has 20 signals.
+~~~
+
+The file lands in `vcd/dump.vcd`.
+
+> **What the step does for you.** It finds the generated simulation directory,
+> copies the simulator's TCL script, inserts `open_vcd` and a `log_vcd` command
+> before the existing `log_wave`, changes `quit` to `close_vcd; quit`, patches
+> the launcher batch file so it can be called from elsewhere, re-runs the
+> simulation, and collects the resulting VCD. If you ever need to do this by
+> hand for a different project, those are the steps.
+
+The demo traces at **port** level, so the VCD contains the IP's interface
+signals rather than its several hundred internal ones. Those interface signals
+are exactly what we want to look at.
 
 ## Viewing the Timing Diagram
-After you have created VCD file, you can see the timing diagram from the [jupyter notebook](https://github.com/sdrangan/hwdesign/tree/main/scalar_fun/notebooks/view_timing.ipynb).
 
-## Understanding the `xsim_vcd.py` function. 
+~~~bash
+(env) python scalar_fun_build.py --through timing_diagram
+~~~
 
-I wrote the function  `xsim_vcd.py` to automate the process of adding a VCD trace.
-But you may want to know how this function works, in case you need to modify later.
-Basically, the `xsim_vcd.py` does these steps automatically.
+This writes two figures, because they answer different questions:
 
-* After running the initial simulation, locate the directory where the simulation files are.
-For the scalar adder simulation, it will be in something like:
+| File | What it shows |
+|---|---|
+| `results/timing_diagram_call.png` | one call, with its phases shaded |
+| `results/timing_diagram.png` | the whole run, with each call marked |
 
-```bash
-scalar_fun_vitis\hls_component\scalar_fun\hls\sim\verilog
-```
+The zoom window for the first is read off the decoded trace rather than being
+typed in, so it stays right if the test vector changes. `--trange T0 T1`
+overrides it if you want to look somewhere specific.
 
-This large directory contains automatically generated RTL files for the testbench along with simuation files.
-We will modify these files to output a VCD file and re-run the simulation. 
-* In this directory, there will be a file `scalar_fun.tcl` which sets the configuration for the simulation.  Copy the file to a new file `scalar_fun.tcl` and modify as follows:
-   *  Add initial lines at the top of the file (before the `log_wave -r /`) line:
+<img src="images/axi_lite_transaction.png" alt="AXI4-Lite timing diagram for one call to the IP" width="900"/>
 
-    ```tcl
-    open_vcd
-    log_vcd * 
-    ```
+### Reading it
 
-    * At the eend of the file there is:
-    ```tcl
-    run all
-    quit
-    ```
-    
-    Modify these lines to:
-    ```
-    run all
-    close_vcd
-    quit
-    ```
+The diagram shows the AXI4‑Lite channels: the write address channel
+(`AWVALID`/`AWREADY`/`AWADDR`), the write data channel
+(`WVALID`/`WREADY`/`WDATA`), the write response channel
+(`BVALID`/`BREADY`), the read address channel (`ARVALID`/`ARREADY`/`ARADDR`)
+and the read data channel (`RVALID`/`RREADY`/`RDATA`).
 
-* In the same directory, there is a file, `run_xsim.bat`.  
-   * There should be a line like:
+You can already see the shape of one call: a burst of writes, a pause, then two
+reads. The addresses on `AWADDR` and `ARADDR` are the **register map** the
+`bundle=CTRL` pragmas created. Decoding them transfer by transfer is the
+subject of the [next page](./execution.md).
 
-    ```bash
-    call C:/Xilinx/2025.1/Vivado/bin/xsim  ... -tclbatch scalar_fun.tcl -view add_dataflow_ana.wcfg -protoinst add.protoinst
-    ```
-   
-   * Copy just this line to a new file `run_xsim_vcd.bat` and modify that line to:
+One thing to notice now: every transfer completes with `VALID` and `READY` both
+high on the same clock edge — the rule from the first half of this unit, on
+real hardware.
 
-    ```bash
-    cd /d "%~dp0"
-    call C:/Xilinx/2025.1/Vivado/bin/xsim  ... -tclbatch scalar_fun_vcd.tcl -view add_dataflow_ana.wcfg -protoinst add.protoinst
-    ```
+## Running the whole flow
 
-    That is, we add a `cd /d` command to make the file callable from a different directory, and we change the `tclbatch` file from `scalar_fun.tcl` to `scalar_fun_vcd.tcl`
-* Go back to the directory `scalar_fun_vitis` Re-run the simulation with 
+Every step so far, in one command:
 
-```bash
-./run_xsim_vcd.bat
-```
+~~~bash
+(env) python scalar_fun_build.py --through report
+~~~
 
-This will re-run the simulation and create a `dump.vcd` file of the simulation data.
+`report` depends on everything else, so this is the full flow. It ends with a
+summary:
 
+~~~json
+{
+  "top": "simp_fun",
+  "transaction_cycles": 5,
+  "csim_verified": true,
+  "cosim_verified": true,
+  "timing_diagram": "results\\timing_diagram.png",
+  "calls_decoded": 5
+}
+~~~
 
+If you have run the steps individually, most of this returns immediately —
+only what is stale is redone.
 
+---
+Go to [The Execution Model](./execution.md)

@@ -1,7 +1,7 @@
 ---
 title: Building the FPGA bitstream and PYNQ Overlay
 parent: Bus Basics and Memory‑Mapped Interfaces
-nav_order: 5
+nav_order: 9
 has_children: false
 ---
 # Creating the FPGA Bitstream and PYNQ Overlay
@@ -38,9 +38,9 @@ A **PYNQ overlay** is a packaged hardware design (bitstream + metadata) that can
 The **generate bitstream** command above creates the files that we need for the overlay.  Before continuing, it is useful to bring them to a single location.
 To this end, I created a script to this (actually, I got ChatGPT to write the script :) ) to perform this file collection:
 
-* Go to the project folder.  So, for the scalar adder project this is `/hwdesign/scaler_fun`
-* Activate the virtual environment for the `xilinxutils` package, if has not been activated.
-* Navigate to the Vivado project directory for the board.  For example `/hwdesign/scalar_fun/scalar_fun_pynqz2/`
+* Go to the project folder.  So, for the scalar function project this is `hwdesign/demos/scalar_fun`
+* [Activate the virtual environment](../../support/repo/package.md) with `waveflow`, if it has not been activated.  `collect_overlay` is part of that package.
+* Navigate to the Vivado project directory for the board.  For example `hwdesign/demos/scalar_fun/scalar_fun_pynqz2/`
 * In the project directory simply run:
 ~~~bash
    collect_overlay
