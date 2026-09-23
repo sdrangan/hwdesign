@@ -81,6 +81,46 @@ rather than through a wire, because `return` was bound to the AXI4‑Lite bundle
 
 **Four writes and two reads to compute one number.** Hold on to that.
 
+### Where the offsets come from
+
+`0x10`, `0x18`, `0x20`, `0x28` — why those? Vitis lays out an `s_axilite`
+bundle to a fixed pattern, and you can read it straight out of the generated
+register-map module, `scalar_fun_proj/solution1/syn/verilog/simp_fun_CTRL_s_axi.v`:
+
+~~~text
+// 0x00 : Control signals        (ap_start bit 0, ap_done bit 1)
+// 0x04 : Global Interrupt Enable Register
+// 0x08 : IP Interrupt Enable Register
+// 0x0c : IP Interrupt Status Register
+// 0x10 : Data signal of x
+// 0x14 : reserved
+// 0x18 : Data signal of w
+// 0x1c : reserved
+// 0x20 : Data signal of b
+// 0x24 : reserved
+// 0x28 : Data signal of y
+// 0x2c : Control signal of y
+~~~
+
+Two things set the layout. A **control block** takes the first four registers,
+which is why the arguments start at `0x10` rather than `0x04`. Then each
+argument takes **two** 32-bit slots: one for the data and one that is reserved
+— except for an output like `y`, where the second slot carries a valid bit.
+
+The stride follows the argument's **width**, not a fixed spacing. A 64-bit
+argument needs two slots for its data plus one for control, so it takes three:
+
+~~~text
+// 0x28 : Data signal of ll      (bits 31:0)
+// 0x2c : Data signal of ll      (bits 63:32)
+// 0x30 : reserved
+~~~
+
+The tool also leaves gaps that follow no rule you would want to rely on. So
+the practical advice is the one real drivers follow: **never compute these
+offsets by hand.** Vitis writes them into the generated driver header, and
+that is what software should read.
+
 ## Five calls in a row
 
 <img src="images/axi_lite_multi.png" alt="AXI4-Lite timing diagram over five successive calls, each marked" width="900"/>
