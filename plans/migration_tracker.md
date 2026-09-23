@@ -42,7 +42,7 @@ for that unit; the demo/lab rows are the runnable material.
 |---|---|---|---|---|
 | [units/unit01_basic_logic/figs/logic_figs.ipynb](../units/unit01_basic_logic/figs/logic_figs.ipynb) | x:4 | dead-xilinxutils | todo | likely `waveflow.utils.timing` (TimingDiagram) |
 | [demos/simp_fun/timing_diag.ipynb](../demos/simp_fun/timing_diag.ipynb) | x:9 | dead-xilinxutils | todo | timing-diagram demo → `waveflow.utils.timing` |
-| [demos/scalar_fun/notebooks/view_timing.ipynb](../demos/scalar_fun/notebooks/view_timing.ipynb) | x:7 | dead-xilinxutils | todo | |
+| demos/scalar_fun/notebooks/view_timing.ipynb | x:7 | dead-xilinxutils | deleted | replaced by the `timing_diagram` step in [scalar_fun_build.py](../demos/scalar_fun/scalar_fun_vitis/scalar_fun_build.py); plotting is a build step now, not a notebook |
 | [docs/demos/simp_fun/simulation.md](../docs/demos/simp_fun/simulation.md) | x:4 | dead-xilinxutils | todo | docs for simp_fun |
 
 ### unit02_fsm

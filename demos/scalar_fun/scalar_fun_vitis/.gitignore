@@ -19,3 +19,11 @@
 
 _ide/logs
 _ide/.wsdata
+
+# --- scalar_fun_build.py outputs ---
+# The Vitis project the build script creates, and everything a run produces.
+/scalar_fun_proj
+/data
+/results
+/vcd
+__pycache__/
