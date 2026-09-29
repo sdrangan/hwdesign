@@ -3,9 +3,9 @@
 Instructor-side. The solution repository is private and is the source; the public
 tree under ``hwdesign/labs/<lab>`` is a build output.  See ``plans/labkit.md``.
 
-    python -m hwdesign.labkit lint    labs/prng
-    python -m hwdesign.labkit publish labs/prng --dry-run
-    python -m hwdesign.labkit publish labs/prng
+    labkit lint    labs/prng
+    labkit publish labs/prng --dry-run
+    labkit publish labs/prng
 
 The student-side counterpart is ``StudentSourceStep`` in
 :mod:`hwdesign.grading`, which copies a file up out of ``partial/`` the first

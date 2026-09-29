@@ -33,7 +33,7 @@ So the direction is fixed and one-way:
 ```
 hwdesign-soln/labs/prng/     the source — full, working, annotated
         │
-        │   python -m hwdesign.labkit publish
+        │   labkit publish
         ▼
 hwdesign/labs/prng/          a build output — never edited by hand
 ```
@@ -112,8 +112,8 @@ pip install -e ../pysilicon
 pip install -e .
 ```
 
-The second line is what makes `python -m hwdesign.labkit` work from inside
-`hwdesign-soln`, which is where you will run it.
+The second line also installs the `labkit` command, which publishes labs. You run
+it from inside `hwdesign-soln`.
 
 Run the test suite from the `hwdesign` root with `pytest`. It is tiered: most of
 it is pure Python and takes seconds, and the tests that drive Vivado are marked
