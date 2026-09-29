@@ -140,53 +140,109 @@ unusual a particular lab leaves behind.
 
 ## Publishing
 
-Yes, the copy into the student repository is automated. That is what `publish`
-does — it writes across repositories, using the `public` path from `lab.toml`.
+Once the solution lab is complete and scores full marks, the next step is to
+**publish** it: write the student copy, with the solutions redacted, into the
+public `hwdesign` repository. `publish` does this, writing across repositories
+to the `public` path given in `lab.toml`.
 
-Run these from the `hwdesign-soln` root:
+You do this with the `labkit` command, which is installed along with `hwdesign`
+(`pip install -e .` from the `hwdesign` root; see
+[the repositories](./repo.md#python-environment)). Everything it needs to know
+about a lab, including where the student copy goes, is in that lab's
+`lab.toml`, so every command takes just the lab directory — and you can leave
+even that out when you are standing in it. These are all the same:
 
 ```bash
-# Check the markers parse. Writes nothing.
-python -m hwdesign.labkit lint labs/prng
-
-# Show exactly what would be written, and write nothing.
-python -m hwdesign.labkit publish labs/prng --dry-run
-
-# Write the student tree.
-python -m hwdesign.labkit publish labs/prng
-
-# Exit 1 if the published tree differs from what the solution would produce.
-python -m hwdesign.labkit check labs/prng
+cd hwdesign-soln        && labkit check labs/prng
+cd hwdesign-soln/labs   && labkit check prng
+cd hwdesign-soln/labs/prng && labkit check
 ```
 
-`check` is the one to run before committing, and the one to put in CI. It has to
-run from the private side, because that is the only side that can see both trees.
+Point it at the **solution** lab in `hwdesign-soln`, never at the published
+copy in `hwdesign/labs/` — that one has no `lab.toml`, and `labkit` says so.
 
-After a publish there are changes in **two** repositories. Commit them
-separately, and read the `hwdesign` diff before pushing it — it is the last human
-look at what becomes public.
+To publish a lab, from the `hwdesign-soln` root:
 
-## What the guards will stop you doing
+1. **Run the checks.** This runs every check in
+   [The checks labkit runs](#the-checks-labkit-runs), and writes nothing.
 
-A publish fails, writing nothing, on any of these:
+   ```bash
+   labkit lint labs/prng
+   ```
 
-1. A file in the lab directory listed nowhere and matching no ignore pattern.
-2. Unbalanced, nested, or out-of-order markers.
-3. A marker token that would survive into a published file — usually an annotated
-   file listed as `full`.
-4. A line from inside a solution block appearing anywhere in the published tree.
-5. A `public` path that overlaps the solution directory.
-6. A file listed as `partial` that contains no `BEGIN SOLUTION` block — you either
-   meant `full`, or you forgot to annotate it.
+2. **See what would be written.** This lists every file it would copy whole or
+   redact, and still writes nothing. Read the list — a file in the wrong column
+   is the mistake to catch here.
 
-Guard 4 is the one that matters. It is the only check that catches a leak you
-cannot see by reading the diff — a block closed a line early, or a file
-misclassified in `lab.toml`. Short and structural lines (`end`, `);`) are ignored,
-as is anything that also appears outside a solution block — including everything
-in your `TODO` and `STUB` sections, which are student-facing by construction. So
-a failure here is worth taking seriously rather than working around.
+   ```bash
+   labkit publish labs/prng --dry-run
+   ```
 
-### When guard 4 is wrong
+3. **Publish.**
+
+   ```bash
+   labkit publish labs/prng
+   ```
+
+   This runs the same checks again, and writes nothing unless they all pass,
+   so a failed publish leaves the public tree as it was.
+
+4. **Remove anything the lab no longer has.** `publish` writes and overwrites
+   files but never deletes them. If you renamed or dropped a file since the last
+   publish, the old copy is still in `hwdesign/labs/prng/`; delete it with
+   `git rm` there.
+
+5. **Confirm the public tree matches.** This exits with status 1, naming each
+   file, if anything published differs from what the solution would produce now.
+
+   ```bash
+   labkit check labs/prng
+   ```
+
+   Run it before every commit — and any time you are unsure whether a solution
+   edit was published. It has to run from `hwdesign-soln`, the only side that
+   can see both trees.
+
+6. **Commit the two repositories separately.** Read the `hwdesign` diff before
+   pushing it: it is the last human look at what becomes public.
+
+`labkit --help` lists the commands, and `labkit publish --help` the options.
+`python -m hwdesign.labkit` runs the same thing, if the command is not on your
+path.
+
+## The checks labkit runs
+
+Before it writes anything, `labkit` checks the lab for the mistakes that would
+publish something broken or leak an answer. **Every command runs all of these
+checks** — `lint`, `publish --dry-run`, `publish` and `check` alike. `lint` is
+simply the quickest way to run them, because it does nothing else. If any check
+fails, the command stops with an error naming the file and line, and nothing is
+written.
+
+| Check | Fails when | Usually means |
+| --- | --- | --- |
+| **Every file is classified** | A file in the lab directory is in none of `full`, `partial`, `private` or `ignore` | A new file you forgot to add to `lab.toml` |
+| **Markers are well formed** | Markers are unbalanced, nested, or out of order | A missing `END SOLUTION` |
+| **No marker is published** | A marker would appear in a published file | An annotated file listed as `full` instead of `partial` |
+| **No solution leaks** | A line from inside a solution block appears anywhere in the published tree | See below |
+| **Public is separate** | The `public` path is inside the solution directory, or the other way round | A wrong `public` path in `lab.toml` |
+| **Partial files are annotated** | A file listed as `partial` has no `BEGIN SOLUTION` block | It should be `full`, or you forgot to annotate it |
+
+**The leak check is the one that matters.** It is the only one that catches a
+leak you cannot see by reading the diff: a block closed a line early, or a file
+listed in the wrong column of `lab.toml`. It takes every line inside your
+solution blocks and looks for it in every file that would be published. Short,
+structural lines (`end`, `);`) are ignored, and so is any line that also appears
+outside a solution block, including everything in your `TODO` and `STUB`
+sections, which are meant for students. So when it fires, take it seriously
+rather than working around it.
+
+A common way to trip it is the build script, which ships whole. If the grader
+computes something the same way the solution does, the grader's line matches the
+solution's. The fix is to write the grader's version differently — not to hide
+the match. See `lab_cases()` in `rootsolve_build.py` for an example.
+
+### When the leak check is wrong
 
 It fires on one thing that is not a leak: library boilerplate identical inside a
 solution block and in a file shipped whole. Writing `prng` produced two —
@@ -281,7 +337,7 @@ directory, publish, and run the published tree with nothing filled in:
 ```bash
 cp -r labs/prng /tmp/soln/labs/prng
 sed -i 's|public = .*|public = "/tmp/pub/labs/prng"|' /tmp/soln/labs/prng/lab.toml
-python -m hwdesign.labkit publish /tmp/soln/labs/prng
+labkit publish /tmp/soln/labs/prng
 cd /tmp/pub/labs/prng && python prng_build.py
 ```
 

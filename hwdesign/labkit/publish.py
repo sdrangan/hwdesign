@@ -93,12 +93,29 @@ def _load_toml(path: Path) -> dict[str, Any]:
     return tomllib.loads(path.read_text(encoding="utf-8"))
 
 
+def _where_hint(lab_dir: Path) -> str:
+    """What to do instead, when *lab_dir* is not a solution lab.
+
+    The two likely mistakes are running from the directory *above* the labs,
+    and running from the published student copy -- which has a ``partial/``
+    and no ``lab.toml``, because the manifest never ships.
+    """
+    labs = sorted(p.parent.name for p in lab_dir.glob("*/lab.toml"))
+    if labs:
+        return (f" The labs here are: {', '.join(labs)}. Name one, for example "
+                f"`labkit check {labs[0]}`.")
+    if (lab_dir / "partial").is_dir():
+        return (" This looks like the published student copy. labkit runs on the "
+                "solution lab, in hwdesign-soln/labs/<name>.")
+    return " Run labkit inside a solution lab directory, or give its path."
+
+
 def load_manifest(lab_dir: Path | str) -> LabManifest:
     """Read and validate ``lab.toml`` from *lab_dir*."""
     lab_dir = Path(lab_dir).resolve()
     path = lab_dir / "lab.toml"
     if not path.exists():
-        raise PublishError(f"No lab.toml in {lab_dir}.")
+        raise PublishError(f"No lab.toml in {lab_dir}.{_where_hint(lab_dir)}")
 
     data = _load_toml(path).get("lab")
     if not isinstance(data, dict):
@@ -313,30 +330,35 @@ def _check_no_leak(published: dict[Path, str], dropped: list[str], kept: set[str
 
 
 def main(argv: list[str] | None = None) -> int:
-    """``python -m hwdesign.labkit <command> <lab_dir>``."""
+    """``labkit <command> <lab_dir>`` -- also ``python -m hwdesign.labkit``."""
     import argparse
 
     parser = argparse.ArgumentParser(
-        prog="python -m hwdesign.labkit",
+        prog="labkit",
         description="Derive a lab's public student tree from its annotated solution.")
     sub = parser.add_subparsers(dest="command", required=True)
 
     for name, help_text in (
             ("publish", "Write the student tree."),
             ("check", "Exit 1 if publishing would change anything (the CI gate)."),
-            ("lint", "Verify the markers parse. Writes nothing.")):
+            ("lint", "Run every check publish runs, and write nothing.")):
         p = sub.add_parser(name, help=help_text)
-        p.add_argument("lab_dir", type=Path, help="The solution lab directory (holds lab.toml).")
+        p.add_argument("lab_dir", type=Path, nargs="?", default=Path("."),
+                       help="The solution lab directory, the one holding lab.toml. "
+                            "Defaults to the current directory.")
         if name == "publish":
             p.add_argument("--dry-run", action="store_true",
                            help="Report what would be written, and write nothing.")
 
     args = parser.parse_args(argv)
+    # The directory's own name, so `labkit check` run inside a lab does not
+    # report on ".".
+    label = args.lab_dir.resolve().name
 
     try:
         if args.command == "lint":
             report = publish(args.lab_dir, dry_run=True)
-            print(f"{args.lab_dir}: markers OK — {report.summary()}")
+            print(f"{label}: markers OK — {report.summary()}")
             return 0
 
         if args.command == "check":
@@ -347,7 +369,7 @@ def main(argv: list[str] | None = None) -> int:
             if stale:
                 print(f"{len(stale)} file(s) differ from the solution. Run publish.")
                 return 1
-            print(f"{args.lab_dir}: student tree is up to date ({report.summary()})")
+            print(f"{label}: student tree is up to date ({report.summary()})")
             return 0
 
         report = publish(args.lab_dir, dry_run=args.dry_run)
@@ -363,15 +385,25 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
 
+def _unix_newlines(data: bytes) -> bytes:
+    return data.replace(b"\r\n", b"\n")
+
+
 def _stale(lab_dir: Path | str) -> list[Path]:
     """Paths whose published content differs from what a publish would produce."""
     manifest = load_manifest(lab_dir)
     full, partial = _classify(manifest)
     stale: list[Path] = []
 
+    # Compared with line endings normalised.  With core.autocrlf on Windows, a
+    # checkout of either repository rewrites its files with CRLF, and a
+    # byte-for-byte comparison then calls every whole-copied file stale although
+    # git would commit the same content.  The partial files already compare as
+    # decoded text, which is why only these were affected.
     for rel in full:
         dest = manifest.public / rel
-        if not dest.exists() or dest.read_bytes() != (manifest.root / rel).read_bytes():
+        if not dest.exists() or (_unix_newlines(dest.read_bytes())
+                                 != _unix_newlines((manifest.root / rel).read_bytes())):
             stale.append(dest)
     for rel in partial:
         dest = manifest.public / "partial" / rel

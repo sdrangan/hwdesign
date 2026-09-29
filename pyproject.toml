@@ -72,6 +72,7 @@ include = ["hwdesign*"]
 # so it was course-specific all along and only ended up upstream by accident.
 [project.scripts]
 build_lab_autograder = "hwdesign.scripts.build_lab_autograder:main"
+labkit = "hwdesign.labkit.publish:main"
 
 # ---------------------------------------------------------------------------
 # Tests

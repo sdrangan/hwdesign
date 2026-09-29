@@ -1,208 +1,155 @@
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <vector>
-#include <cmath>
-#include <iomanip>
+// Testbench for the rootsolve lab.
+//
+// The same file serves C simulation and RTL co-simulation: Vitis compiles it
+// against fsolve.cpp for `csim_design`, and against the synthesized RTL for
+// `cosim_design`.  It does three things:
+//
+//   1. reads the test vectors your golden model wrote, vectors/tv_python.csv
+//   2. calls fsolve() once per vector
+//   3. writes what came back to vectors/tv_csim.csv or vectors/tv_cosim.csv
+//
+// It does not decide whether the answers are right.  That is fsolve_eval.py's
+// job, so that the tolerances live in one place and nothing has to be kept
+// in step between a C++ file and a Python one.  The testbench returns
+// non-zero only when it could not do its job at all -- a missing vector file,
+// an output it could not write.  Returning non-zero on a *wrong answer* would
+// make Vitis report the whole co-simulation as failed and throw away the
+// output file that says which vectors were wrong.
+//
+// Which output file is written comes from the one argument the build passes
+// (`csim_design -argv csim`, `cosim_design -argv cosim`).  Both paths are
+// found relative to this file rather than to the working directory, because
+// Vitis runs the testbench from deep inside the project -- and a different
+// place for co-simulation than for C simulation.
 
-static std::string get_tb_dir() {
-    std::string path = __FILE__;
-    size_t pos = path.find_last_of("/\\");
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include "fsolve.h"
+
+// The directory this file is in.  __FILE__ is the path the compiler was
+// given, which for Vitis is absolute.
+static std::string source_dir() {
+    const std::string path = __FILE__;
+    const size_t pos = path.find_last_of("/\\");
     return (pos == std::string::npos) ? "." : path.substr(0, pos);
 }
 
-static const std::string tb_dir = get_tb_dir();
-
-
-// Forward declaration of the function under test
-void fsolve(
-        float a0,
-        float a1,
-        float a2,
-        float x0,
-        float tol,
-        int max_iter,
-        float step,
-        float &x,
-        float &fx,
-        int &niter);
-
-// Structure to hold test vectors
-struct TestVector {
-    float a0;
-    float a1;
-    float a2;
-    float x0;
-    float step;
-    float tol;
+// One row of vectors/tv_python.csv.  The first seven fields are fsolve()'s
+// inputs, in its argument order; the last three are the golden model's answer.
+//
+// The model's answer is `x_model`, not `x`, and that is not just for clarity.
+// Co-simulation rewrites every call to fsolve() in this file, and a struct
+// field with the same name as one of fsolve()'s output arguments makes that
+// rewrite fail -- "C/RTL co-simulation file generation failed", with nothing
+// else to go on -- while C simulation runs perfectly.  Keep the names apart.
+struct Vector {
+    float a0, a1, a2, x0, tol;
     int max_iter;
-    float x_root_expected;
-    float fx_expected;
-    int iterations_expected;
+    float step;
+    float x_model, fx_model;
+    int niter_model;
 };
 
-// Function to parse CSV line
-bool parse_csv_line(const std::string &line, TestVector &tv, bool is_header = false) {
-    if (is_header) return true; // Skip header line
-    
+// The column header both output files carry.  The same names as the vector
+// file, so fsolve_eval.py can read the kernel's answer from `x`, `fx` and
+// `niter` exactly as it reads the model's.
+static const char *kHeader = "a0,a1,a2,x0,tol,max_iter,step,x,fx,niter";
+
+// Parse one CSV line into a Vector.  Returns false on a malformed line.
+static bool parse_vector(const std::string &line, Vector &v) {
     std::stringstream ss(line);
-    std::string token;
-    int field_count = 0;
-
-    while (std::getline(ss, token, ',')) {
-        if (field_count == 0) {
-            tv.a0 = std::stof(token);
-        } else if (field_count == 1) {
-            tv.a1 = std::stof(token);
-        } else if (field_count == 2) {
-            tv.a2 = std::stof(token);
-        } else if (field_count == 3) {
-            tv.x0 = std::stof(token);
-        } else if (field_count == 4) {
-            tv.step = std::stof(token);
-        } else if (field_count == 5) {
-            tv.tol = std::stof(token);
-        } else if (field_count == 6) {
-            tv.max_iter = std::stoi(token);
-        } else if (field_count == 7) {
-            tv.x_root_expected = std::stof(token);
-        } else if (field_count == 8) {
-            tv.fx_expected = std::stof(token);
-        } else if (field_count == 9) {
-            tv.iterations_expected = std::stoi(token);
-        }
-        field_count++;
+    std::string f[10];
+    for (int k = 0; k < 10; k++) {
+        if (!std::getline(ss, f[k], ',')) return false;
     }
-
-    return field_count == 10;
+    v.a0 = std::stof(f[0]);
+    v.a1 = std::stof(f[1]);
+    v.a2 = std::stof(f[2]);
+    v.x0 = std::stof(f[3]);
+    v.tol = std::stof(f[4]);
+    v.max_iter = std::stoi(f[5]);
+    v.step = std::stof(f[6]);
+    v.x_model = std::stof(f[7]);
+    v.fx_model = std::stof(f[8]);
+    v.niter_model = std::stoi(f[9]);
+    return true;
 }
 
-int main(int argc, char** argv) {
-
-    // Determine if "rtl" argument is provided
-    bool test_rtl = false;
-    for (int i = 1; i < argc; i++) {
-        if (std::string(argv[i]) == "rtl") {
-            test_rtl = true;
-            break;
-        }
-    }
-    
-    // Read the the test vectors from the CSV file
-    // Note that the path is relative to the location of this source file,
-    // so it should work regardless of the current working directory
-    // when running the testbench
-    std::string csv_path = tb_dir + "/test_outputs/tv_python.csv";
-    std::cout << "Resolved CSV path = " << csv_path << std::endl;
-
-    std::ifstream csv(csv_path);
-    if (!csv.is_open()) {
-        std::cerr << "Error: Could not open CSV file" << std::endl;
-        return 1;
-    }
-
-    // Select the output CSV file based on the mode 
-    // (C simulation or RTL simulation)
-    std::string vitis_path;
-    if (test_rtl) {
-        std::cout << "Running in RTL co-simulation mode" << std::endl;
-        vitis_path = tb_dir + "/test_outputs/tv_rtl.csv";
-    } else {
-        std::cout << "Running in C simulation mode" << std::endl;
-        vitis_path = tb_dir + "/test_outputs/tv_csim.csv";
-    }
-    std::ofstream vitis_csv(vitis_path);
-    if (!vitis_csv.is_open()) {
-        std::cerr << "Error: Could not open output CSV file" << std::endl;
-        return 1;
-    }
-
-    // Write header to output CSV file
-    vitis_csv << "a0,a1,a2,x0,step,tol,max_iter,x_root,fx,iterations,";
-    vitis_csv << "x_root_dut,fx_dut,niter_dut" << std::endl;
-
-
-    std::vector<TestVector> test_vectors;
+static std::vector<Vector> read_vectors(const std::string &path) {
+    std::vector<Vector> vectors;
+    std::ifstream in(path.c_str());
+    if (!in) return vectors;
     std::string line;
-    
-    // Skip header line
-    std::getline(csv, line);
-
-    // Read all test vectors
-    while (std::getline(csv, line)) {
+    std::getline(in, line);  // the header
+    while (std::getline(in, line)) {
         if (line.empty()) continue;
-        
-        TestVector tv;
-        if (parse_csv_line(line, tv)) {
-            test_vectors.push_back(tv);
+        Vector v;
+        if (parse_vector(line, v)) {
+            vectors.push_back(v);
         } else {
-            std::cerr << "Error parsing line: " << line << std::endl;
+            std::cout << "Skipping a malformed line: " << line << std::endl;
         }
     }
-    csv.close();
+    return vectors;
+}
 
-    // Run tests
-    int pass_count = 0;
-    int fail_count = 0;
+int main(int argc, char **argv) {
+    // Opening the project in the Vitis GUI and pressing Run passes no
+    // argument, and should still work: it writes the C-simulation file.
+    const std::string mode = (argc > 1) ? argv[1] : "csim";
+    const std::string dir = source_dir() + "/vectors";
+    const std::string in_path = dir + "/tv_python.csv";
+    const std::string out_path = dir + "/tv_" + mode + ".csv";
 
-    std::cout << "========================================" << std::endl;
-    std::cout << "fsolve Testbench" << std::endl;
-    std::cout << "========================================" << std::endl;
-    std::cout << "Total test vectors: " << test_vectors.size() << std::endl;
-    std::cout << std::endl;
+    const std::vector<Vector> vectors = read_vectors(in_path);
+    if (vectors.empty()) {
+        std::cout << "No test vectors in " << in_path
+                  << " -- run the build's `vectors` step first." << std::endl;
+        return 1;
+    }
 
-    for (size_t i = 0; i < test_vectors.size(); i++) {
-        const TestVector &tv = test_vectors[i];
-        
-        // Call the function under test
-        float x = 0.0f;
-        float fx = 0.0f;
+    std::ofstream out(out_path.c_str());
+    if (!out) {
+        std::cout << "Could not write " << out_path << std::endl;
+        return 1;
+    }
+    out << kHeader << "\n";
+
+    std::cout << "fsolve testbench (" << mode << "): " << vectors.size()
+              << " vectors from " << in_path << std::endl;
+
+    for (size_t i = 0; i < vectors.size(); i++) {
+        const Vector &v = vectors[i];
+        float x = 0.0f, fx = 0.0f;
         int niter = 0;
-        
-        // TODO:  Call the fsolve with the parameters from 
-        // the test vector and capture the outputs x, fx, and niter.
-        //   fsolve(...);
-     
-        // Write results to output CSV file
-        vitis_csv << std::setprecision(9) << std::fixed
-              << tv.a0 << "," << tv.a1 << "," << tv.a2 << ","
-              << tv.x0 << "," << tv.step << "," << tv.tol << ","
-              << tv.max_iter << "," << tv.x_root_expected << ","
-              << tv.fx_expected << "," << tv.iterations_expected << ","
-              << x << "," << fx << "," << niter << std::endl;
 
-        // TODO:  Compare the outputs:
-        // Set test_pass = True if and only if:
-        // 1) |x_ - tv_x_root_expected| < tol_x
-        // 2) |fx - tv_fx_expected| < tol_fx
-        // 3) |niter - tv_iterations_expected| <= tol_niter 
+        // TODO:  Call the kernel with this vector's inputs, then write one row
+        // to `out` in the order of kHeader: the seven inputs, then the x, fx
+        // and niter the kernel returned.
+        //
+        //     fsolve(v.a0, ...,  x, fx, niter);
+        //
+        // Write the floats with `std::setprecision(9)`.  Nine significant
+        // digits is what it takes for every float to survive the round trip
+        // through text unchanged; the default of six would make an exact
+        // match look like a rounding error.
 
-        // Print test results
-        std::cout << "Test " << (i + 1) << ": ";
-        std::cout << "a=[" << std::fixed << std::setprecision(2) 
-                  << tv.a0 << ", " << tv.a1 << ", " << tv.a2 << "], ";
-        std::cout << "x0=" << tv.x0;
-        
-        if (test_pass) {
-            std::cout << " [PASS]" << std::endl;
-            pass_count++;
-        } else {
-            std::cout << " [FAIL]" << std::endl;
-            fail_count++;
-        }
-        
-        // TODO:  Print detailed results for each test
-        // You can use this as you please to debug your code
-        // and determine what is not matching when a test fails.
-        
+        // A line per vector, for reading while you debug.  This is not the
+        // verdict -- fsolve_eval.py is -- but a root that is visibly wrong,
+        // or an iteration count of zero, shows up here first.
+        std::cout << "  vector " << std::setw(2) << i
+                  << ":  x = " << std::setw(12) << std::setprecision(7) << x
+                  << " (model " << std::setw(12) << v.x_model << ")"
+                  << "   niter = " << std::setw(4) << niter
+                  << " (model " << std::setw(4) << v.niter_model << ")" << std::endl;
     }
 
-    std::cout << std::endl;
-    std::cout << "========================================" << std::endl;
-    std::cout << "Test Results: " << pass_count << " passed, " << fail_count << " failed" << std::endl;
-    std::cout << "========================================" << std::endl;
-
-    vitis_csv.close();
-
-    return (fail_count == 0) ? 0 : 1;
+    out.close();
+    std::cout << "Wrote " << out_path << std::endl;
+    return 0;
 }

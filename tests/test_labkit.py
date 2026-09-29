@@ -335,6 +335,47 @@ def test_check_reports_stale_then_clean(tmp_path, capsys):
     assert "up to date" in capsys.readouterr().out
 
 
+def test_check_ignores_a_crlf_checkout_but_not_a_real_edit(tmp_path, capsys):
+    from hwdesign.labkit.publish import main
+
+    soln = _lab(tmp_path, BASIC)
+    assert main(["publish", str(soln)]) == 0
+
+    # What core.autocrlf does: the same content with the solution checked out
+    # CRLF and the public copy LF.  Both endings are set explicitly, because
+    # write_text already writes CRLF on Windows and LF elsewhere.
+    tb = soln / "tb_prng.sv"
+    published = tmp_path / "pub" / "labs" / "prng" / "tb_prng.sv"
+    lf = tb.read_bytes().replace(b"\r\n", b"\n")
+    published.write_bytes(lf)
+    tb.write_bytes(lf.replace(b"\n", b"\r\n"))
+    capsys.readouterr()
+    assert main(["check", str(soln)]) == 0
+
+    tb.write_text("// testbench, edited\n", encoding="utf-8")
+    assert main(["check", str(soln)]) == 1
+    assert "tb_prng.sv" in capsys.readouterr().out
+
+
+def test_the_lab_directory_defaults_to_where_you_are(tmp_path, capsys, monkeypatch):
+    from hwdesign.labkit.publish import main
+
+    soln = _lab(tmp_path, BASIC)
+    monkeypatch.chdir(soln)
+    assert main(["lint"]) == 0
+    # Named for the lab, not for ".".
+    assert capsys.readouterr().out.startswith("prng: markers OK")
+
+
+def test_running_above_the_labs_names_them(tmp_path, capsys, monkeypatch):
+    from hwdesign.labkit.publish import main
+
+    soln = _lab(tmp_path, BASIC)
+    monkeypatch.chdir(soln.parent)
+    assert main(["check"]) == 1
+    assert "The labs here are: prng" in capsys.readouterr().err
+
+
 def test_cli_reports_an_error_without_a_traceback(tmp_path, capsys):
     from hwdesign.labkit.publish import main
 
