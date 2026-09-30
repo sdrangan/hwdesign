@@ -10,7 +10,8 @@ has_children: false
 ## Protocol Structure
 
 The  **AXI4-Stream protocol** is a
-lightweight data transfer mechanism that uses a simple **handshake** between the source (master) and sink (slave). Data is sent in units called **bursts**, which are sequences of one or more data **beats**. Each beat is transferred when both sides agree: the source asserts **TVALID** to indicate valid data, and the sink asserts **TREADY** to signal readiness to accept it.
+lightweight data transfer mechanism that uses a simple **handshake** between the source (the transmitter; master in older texts
+and in Vitis) and sink (the receiver; slave). Data is sent in units called **bursts**, which are sequences of one or more data **beats**. Each beat is transferred when both sides agree: the source asserts **TVALID** to indicate valid data, and the sink asserts **TREADY** to signal readiness to accept it.
 
 Within a burst:
 
