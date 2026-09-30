@@ -70,9 +70,9 @@ for that unit; the demo/lab rows are the runnable material.
 | [demos/fifoif/python/gen_vitis_code.py](../demos/fifoif/python/gen_vitis_code.py) | x:1 | dead-xilinxutils | todo | codegen → compare to `waveflow.build.*` |
 | [demos/fifoif/python/view_axi_stream.ipynb](../demos/fifoif/python/view_axi_stream.ipynb) | x:11 | dead-xilinxutils | todo | AXI-stream view → `waveflow.utils.vcd` |
 | [demos/fifoif/fifo_fun_vitis/src/cmd.h](../demos/fifoif/fifo_fun_vitis/src/cmd.h) | x:1 | dead-xilinxutils | todo | C++ header comment/include |
-| [demos/stream/avg_demo.ipynb](../demos/stream/avg_demo.ipynb) | p:3 | live-pysilicon | todo | |
-| [demos/stream/poly_demo.ipynb](../demos/stream/poly_demo.ipynb) | p:14 | live-pysilicon | todo | |
-| [docs/demos/fifoif/poly.md](../docs/demos/fifoif/poly.md) | p:2 | live-pysilicon | todo | |
+| demos/stream/avg_demo.ipynb | p:3 | live-pysilicon | deleted | replaced by [avgfilt_build.py](../demos/stream/avgfilt/avgfilt_build.py): pysim / plot_python / csim / csynth / cosim, each verified against a float32 golden model; docs in `docs/demos/stream/` rewritten around the steps. The timing-diagram view was dropped. |
+| demos/stream/poly_demo.ipynb | p:14 | live-pysilicon | deleted | replaced by [poly_build.py](../demos/stream/poly/poly_build.py): hand-written kernel and testbench on headers generated from `poly_schema.py` (waveflow `DataSchemaStep`), WORD_BW 32/64, functional golden model, csim/cosim verified and messages decoded from the VCD. Its docs are the Command-Response FIFO Interface section, `docs/demos/fifoif/`. |
+| [docs/demos/fifoif/poly.md](../docs/demos/fifoif/poly.md) | p:2 | live-pysilicon | integrated | Rewritten around `poly_build.py`, with new step pages `poly_python.md`, `poly_sim.md` and `poly_timing.md` in the same section. The section stays separate from AXI4-Streaming (avgfilt). |
 
 ### unit06_timing
 | File | refs | category | status | integration notes |
