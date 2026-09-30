@@ -20,5 +20,20 @@ Within a burst:
 
 This handshake ensures **flow control**: the source never overruns the sink, and the sink can apply backpressure by deasserting TREADY.
 
+## Pure Streaming
+
+The full protocol has more signals than these three. The most important is
+**TLAST**, which the source raises on the final beat of a burst to mark
+where one frame of data ends. In **pure streaming** there are no frames:
+the stream is one endless sequence of samples, so there is no TLAST. The
+only signals are **TDATA**, **TVALID** and **TREADY**, in each direction.
+
+The IP in this demo also has no **start** or **done** signal. The scalar
+function IP ran once each time the processor started it. This one never
+stops: whenever a sample arrives on the input stream it computes, and
+whenever the output stream can accept a sample it writes one.
+
 ---
+
+Go to [The Averaging Kernel](./avg.md)
 

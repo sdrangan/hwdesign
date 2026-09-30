@@ -8,7 +8,7 @@ has_children: false
 
 ## Problems with Control Register Interfaces
 
-In the [scalar function example](../scalar_fun/), the inputs and outputs were written and read via AXI-Lite control registers via a simple execution model:
+In the [scalar function example](../procif/), the inputs and outputs were written and read through AXI4-Lite control registers, with a simple execution model:
 
 * PS sets control registers on the IP
 * PS sets a specific register (`ap_start`) to start execution
@@ -36,4 +36,4 @@ In summary, the command-response interface eliminates the need for constant poll
 
 ---
 
-Go to [polynomial esxample](./poly.md).
+Go to [The Polynomial Example](./poly.md)
