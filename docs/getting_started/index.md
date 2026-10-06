@@ -38,7 +38,7 @@ Everything else runs in simulation on your laptop.
 
 ## 3. Get the code & set up Python
 
-Two steps, in order:
+Three steps, in order:
 
 1. **[Clone the repository](../support/repo/repo.md)** — all the course material
    lives in one GitHub repo.
@@ -46,6 +46,9 @@ Two steps, in order:
    virtual environment, then install `waveflow` (the hardware modeling
    framework, from GitHub) and `hwdesign` (this course's helpers, from your
    clone). That page ends with a snippet to verify the install.
+3. **[Create your course repository](../support/repo/work.md)** — one public
+   GitHub repository, `hwdesign-work`, where you keep your own work and which
+   some assignments are submitted from.
 
 Instructors and course assistants who need to modify course material or
 `waveflow` itself should follow

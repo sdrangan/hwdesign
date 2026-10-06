@@ -22,6 +22,9 @@ semester.
 * [Unit 4:  Root solver for a nonlinear function](./rootsolve/)
    * Implement a simple iterative root solver accelerator in Vitis HLS and optionally
    connect to a processor.
+* [Unit 5:  Command-response mini-project](./cmdresp/)
+   * Specify a streaming accelerator in the command-response pattern, and have
+   an AI agent build it through C simulation, co-simulation and synthesis.
 * [Unit 7:  Pipelined line intersection accelerator](./intersect/)
    * Build a simple intersection detector that can be used in physical and robotics simulations
 
