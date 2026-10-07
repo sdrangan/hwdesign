@@ -196,9 +196,8 @@ uv pip install -e .
 > `waveflow` on PyPI.  Installing waveflow first satisfies the dependency.
 
 {: .note }
-> Do **not** use `requirements.txt` here.  That file is a pre-migration snapshot
-> of a different environment and does not list either package; the two commands
-> above are the complete install.
+> These two commands are the complete install: every other package comes in as
+> a dependency of one of them.
 
 {: .warning }
 > Do **not** `uv pip install pywaveflow` yet.  waveflow is published on PyPI

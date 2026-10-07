@@ -114,37 +114,14 @@ course-specific code matures into something generally useful, move it up into
 waveflow rather than letting `hwdesign` grow into a second general-purpose
 package.
 
-## Regenerating the requirements files
+## Where dependencies are declared
 
-`requirements.txt` pins exact versions; `requirements-loose.txt` is the same list
-without version constraints. Regenerate them with:
+There is no pinned `requirements.txt`. Dependencies are declared, with lower
+bounds only, in `pyproject.toml` -- this repo's for what the course material
+imports directly, and waveflow's for what waveflow needs -- so every install
+gets current releases. Add a new dependency to the `pyproject.toml` of the
+package that imports it.
 
-```bash
-python -m pip freeze > requirements.txt
-```
-
-Then strip the version pins — in Windows PowerShell:
-
-```bash
-(Get-Content requirements.txt) -replace "[<>=~!].*","" | Set-Content requirements-loose.txt
-```
-
-or on macOS / Linux:
-
-```bash
-sed 's/[<>=~!].*//' requirements.txt > requirements-loose.txt
-```
-
-Afterwards, edit `requirements.txt` by hand to remove lines that should not be
-pinned for everyone:
-
-- `pywin32==...` — Windows only.
-- Any `-e git+https://github.com/...#egg=...` line — an artifact of the editable
-  installs, not a dependency others should inherit.
-
-{: .warning }
-> The committed `requirements.txt` and `requirements-loose.txt` are stale: they
-> are full environment freezes from before the waveflow migration and mention
-> neither `waveflow` nor `hwdesign`. Use `requirements-dev.txt` for a developer
-> setup and the [student instructions](./package.md) for a course setup until
-> these two files are regenerated.
+The one upper bound is deliberate: waveflow caps `mcp` below the next major
+version, because each mcp major has removed the server API the one before ran
+on. Lift it only together with a port.
