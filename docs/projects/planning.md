@@ -15,7 +15,7 @@ Before you begin implementing your hardware IP, you will use AI tools to help yo
 - **Initial Plan** — a high‑level description of your IP’s purpose, behavior, and overall architecture, written with the help of AI to clarify the problem and surface design choices. **This is submitted and graded** (20 points), and is the subject of this page.
 - **[Detailed Design Plan](./plan.md)** — module interfaces, testbench strategy, and an incremental development path. This is **not submitted**, but it produces the documents that most of your final grade is based on.
 
-The initial plan is evaluated using the [LLM grader](../aiautograder/), which provides rubric‑aligned feedback to help you strengthen your design. As usual, you can submit to the LLM grader as many times as you want until you are satisfied with the design.  You are expected to use AI tools actively throughout this process—not as a replacement for your own reasoning, but as a structured partner in exploring alternatives, checking consistency, and improving clarity.
+The initial plan is evaluated using the [LLM grader](../ai_tools/autograder.md), which provides rubric‑aligned feedback to help you strengthen your design. As usual, you can submit to the LLM grader as many times as you want until you are satisfied with the design.  You are expected to use AI tools actively throughout this process—not as a replacement for your own reasoning, but as a structured partner in exploring alternatives, checking consistency, and improving clarity.
 
 ---
 

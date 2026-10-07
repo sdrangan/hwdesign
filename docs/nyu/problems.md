@@ -15,9 +15,9 @@ the problems -- including AI and your friends.  Whatever helps you learn.
 Just remember, you will need to be able to complete comparable problems on the midterm and final 
 **without these aids**.  So, use the submission process as part of the learning process.
 
-We are experimenting with an [AI-Autograder](../aiautograder/) for grading problem sets.
+We are experimenting with an [AI-Autograder](../ai_tools/autograder.md) for grading problem sets.
 If successful, you will be able to get immediate, detailed feedback from an AI engine.
-Follow the following steps to prepare and submit solutions.  Follow the [instructions](../aiautograder)
+Follow the following steps to prepare and submit solutions.  Follow the [instructions](../ai_tools/autograder.md)
 for submitting the solutions using the AI-autograder.
 
 ## Feedback, Please!  
