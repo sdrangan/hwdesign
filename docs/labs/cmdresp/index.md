@@ -61,7 +61,7 @@ class session:
    itself.
 2. **Vitis HLS 2025.1**, installed as in [getting started](../../getting_started/).
 3. **The Waveflow MCP server**, connected to your agent, following
-   [Waveflow's MCP setup](https://sdrangan.github.io/waveflow/docs/guide/ai_tooling/mcp_setup.html).
+   [AI Tools ▸ Waveflow MCP](../../ai_tools/waveflow_mcp.md).
    Point it at the course environment's Python, the one with `waveflow`
    installed. The MCP server is how the agent reads the Waveflow reference
    example and documentation.
