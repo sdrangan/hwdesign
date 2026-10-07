@@ -1,15 +1,23 @@
 ---
 title: AI Tools
 parent: Hardware Design
-nav_order: 7
+nav_order: 6
 has_children: true
 ---
 
 # AI Tools
 
-This course is designed to be done *with* an AI assistant -- Claude, ChatGPT,
-GitHub Copilot or similar. Two **MCP servers** connect your assistant to the
-course, and they do different jobs.
+This course is designed to be done *with* AI, in three ways:
+
+- **[AI Autograder](./autograder.md)** -- the portal that grades your problem
+  sets, with feedback, as often as you like to resubmit.
+- **[Course MCP](./course_mcp.md)** -- connects your own AI assistant to the
+  course's problems, solutions and slides, for studying.
+- **[Waveflow MCP](./waveflow_mcp.md)** -- lets an AI agent on your machine
+  build and simulate hardware, for the labs and the project.
+
+The two **MCP servers** both connect an AI assistant to the course, but they do
+different jobs.
 
 An **MCP server** (Model Context Protocol) is a set of tools an AI assistant
 can call. Once connected, your assistant decides on its own when to use them:
@@ -39,6 +47,6 @@ You can connect both: an assistant uses whichever tools fit the question.
 ## Using AI well in this course
 
 The assistant is there to help you learn, not to do the work for you. The
-grading is still done on the [AI Autograder](../aiautograder/) portal, against
+grading is still done on the [AI Autograder](./autograder.md) portal, against
 the instructor's rubric, and what you can do on your own is what the exams test.
 Ask for hints before answers, and ask it to check *your* reasoning.

@@ -1,7 +1,7 @@
 ---
 title: Course MCP (studying)
 parent: AI Tools
-nav_order: 1
+nav_order: 2
 has_children: false
 ---
 
@@ -20,7 +20,7 @@ remember about the topic. Try asking:
 ## What your assistant can see
 
 - every unit's **problems**, with their figures;
-- the **rubric** the [AI Autograder](../aiautograder/) grades each problem
+- the **rubric** the [AI Autograder](./autograder.md) grades each problem
   against, including the common mistakes it looks for;
 - the instructor's **worked solutions**;
 - the **lecture slides**: their text, the instructor's speaker notes, and an

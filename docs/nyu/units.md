@@ -4,7 +4,7 @@ parent: NYU class
 nav_order: 1
 has_children: true
 ---
-A tentative set of units is as follows.  The units are still in flux so new material will be added.   Each unit's problems are on the [AI Grader portal](../aiautograder/), where you can submit them for feedback.
+A tentative set of units is as follows.  The units are still in flux so new material will be added.   Each unit's problems are on the [AI Grader portal](../ai_tools/autograder.md), where you can submit them for feedback.
 
 * Course Introduction
   * Lecture:  [[PDF]](https://github.com/sdrangan/hwdesign/tree/main/units/unit00_course_intro/course_intro.pdf) [[pptx]](https://github.com/sdrangan/hwdesign/tree/main/units/unit00_course_intro/course_intro.pptx)
