@@ -20,6 +20,10 @@ As I am building the site, it may change and go off temporarily.
 * [OpenAI keys and mdoels](./openai.md)
 * [Submitting work on Gradescope](./submit.md)
 
+Your own AI assistant can also read the autograder's problems, rubrics and
+solutions, along with the lecture slides, while you study: see
+[Course MCP](../ai_tools/course_mcp.md).
+
 ## Source Code and Feedback
 
 The AI Autograder project is fully open-source -- you can check out the [GitHub repo](https://github.com/sdrangan/llmgrader).  I would love to get your feedback, positive

@@ -61,8 +61,21 @@ it.
 > point you at one known-working demo to run end-to-end so you can confirm your
 > setup._
 
+## 5. Connect your AI assistant
+
+The course is designed to be done with an AI assistant. Two MCP servers connect
+yours to the course — see [AI Tools](../ai_tools/) for which does what:
+
+- **[Course MCP](../ai_tools/course_mcp.md)** — for studying: your assistant can
+  read the course's problems, rubrics, solutions and lecture slides. One web
+  address, about a minute to set up. Do this now.
+- **[Waveflow MCP](../ai_tools/waveflow_mcp.md)** — for building: lets an agent
+  on your machine write and simulate hardware with Waveflow. Needed for the labs
+  and the project; set it up before the first agent lab.
+
 ## Where to go next
 
+- [AI Tools](../ai_tools/) — connecting your AI assistant to the course.
 - [Demos](../demos/) — worked examples used throughout the course.
 - [Labs](../labs/) — hands-on assignments.
 - [Support Material](../support/) — the full reference for tools, boards, the

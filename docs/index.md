@@ -16,6 +16,10 @@ This repository is for a [NYU class](./nyu/) on introduction to hardware design 
 
 While the course website is designed for NYU students, the material is open to all.
 
+**Studying with an AI assistant?** Connect it to the course with one web
+address, and it can read the course's problems, solutions and lecture slides:
+see [AI Tools](./ai_tools/).
+
 
 <img src="./images/pynq-z2.png" alt="Pynq-Z2 board" width="400"/>
 
