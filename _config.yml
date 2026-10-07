@@ -40,6 +40,25 @@ exclude:
   - requirements-dev.txt
   - pyproject.toml
 
+# Keep everything outside docs/ out of the sidebar nav. units/, demos/ and labs/
+# must still be built (see `exclude` above), but any Markdown in them -- a demo's
+# README.md, for instance -- would otherwise appear as a top-level nav entry
+# titled from its first heading (e.g. "The avgfilt demo"). Setting this here
+# rather than as front matter keeps those READMEs clean when viewed on GitHub.
+defaults:
+  - scope:
+      path: "demos"
+    values:
+      nav_exclude: true
+  - scope:
+      path: "labs"
+    values:
+      nav_exclude: true
+  - scope:
+      path: "units"
+    values:
+      nav_exclude: true
+
 # Mermaid diagrams. Without this block, ```mermaid fences render as plain code
 # blocks rather than diagrams -- just-the-docs only loads the library when a
 # version is pinned here. The version is fetched from the jsdelivr CDN at page
