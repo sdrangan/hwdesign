@@ -35,8 +35,6 @@ exclude:
   - extra/
   - hwdesign/
   - readme.md
-  - requirements.txt
-  - requirements-loose.txt
   - requirements-dev.txt
   - pyproject.toml
 
