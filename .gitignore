@@ -25,6 +25,8 @@ hls/
 *.log
 *.jou
 *.xml
+# ...except the course MCP's demo link overrides, which is written by hand.
+!demos/demos.xml
 *.json
 *.o
 *.obj

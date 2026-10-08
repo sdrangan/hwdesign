@@ -29,7 +29,7 @@ The propagation delay may be too large.
 
 To implement this more complex function, we perform the operations 
 over multiple **stages**.
-This function is implemented in `hwdesign/demos/basic_logic/poly_fun.sv`.
+This function is implemented in `hwdesign/demos/simp_fun/poly_fun.sv`.
 Within this code, you can see three stages:
 
 * Stage 0:  Register the input `x_reg <= x`
@@ -50,7 +50,7 @@ This will generate a large directory `sim` with the simulation outputs including
 `sim/dump.vcd` with the VCD traces.
 
 ## Viewing the Timing Diagram
-Then, go to the [jupyter notebook](https://github.com/sdrangan/hwdesign/blob/main/demos/basic_logic/timing_diag.ipynb) to see the timing diagram:
+Then, go to the [jupyter notebook](https://github.com/sdrangan/hwdesign/blob/main/demos/simp_fun/timing_diag.ipynb) to see the timing diagram:
 
 
 <img src="images/timing_poly_fun.png" alt="Timing diagram" width="800"/>
