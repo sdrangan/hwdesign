@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Corrections to the demo links the course MCP works out on its own.
+
+     The LLM Grader portal serves demos/ and docs/demos/ to students'
+     assistants.  It finds each demo (a docs/demos/ topic folder with the code
+     its pages cite, or a demos/ folder no docs page cites) and ties it to the
+     slides and units that mention it.  This file only says what no slide or
+     docs page does.  It is read on every sync, so a change here needs no
+     course package rebuild.
+
+     <slides deck="..."/> without first/last gives the demo that deck's unit.
+     To see what the portal derives, run llmgrader_mcp_build with its links
+     option in hwdesign-soln.  Schema: llmgrader/schemas/llmgrader_demos.xsd in the
+     llmgrader repo. -->
+<demos>
+  <!-- Combinational SystemVerilog: integer widths, overflow, bit packing. -->
+  <demo id="datatypes"><slides deck="basic-logic"/></demo>
+
+  <!-- Clocked SystemVerilog modules with their testbenches. -->
+  <demo id="simp_fun"><slides deck="fsm"/></demo>
+
+  <demo id="fsm" title="Counter FSM in SystemVerilog">
+    <description>A loadable counter with a synchronous reset, written with
+      separate combinational next-state logic and clocked registers, and its
+      testbench.</description>
+  </demo>
+
+  <demo id="sharedmem" title="Shared-memory accelerator in Vitis HLS">
+    <description>A Vitis HLS accelerator that takes commands and reads and
+      writes a shared-memory image over an AXI master port, addressed by word
+      offsets, with a C testbench and a notebook.</description>
+  </demo>
+
+  <demo id="conv2d" title="2-D convolution in Vitis HLS">
+    <description>A 2-D convolution kernel in Vitis HLS, in a plain and a
+      dataflow version, driven by command and response streams, with a C
+      testbench, Tcl builds and a timing analysis.</description>
+    <slides deck="arrays"/>
+  </demo>
+
+  <demo id="histogram" title="Histogram over AXI4 shared memory">
+    <description>A Vitis HLS histogram that reads its data over an m_axi
+      shared-memory port and takes commands on an AXI4-Stream, with a C
+      testbench and a Python driver.</description>
+    <slides deck="sharedmem" first="40" last="46"/>
+  </demo>
+
+  <demo id="vector_mult" title="Vector multiply with loop unrolling">
+    <description>Element-wise vector multiplication in Vitis HLS over m_axi
+      ports, with a script that sweeps the unroll factor, and a PYNQ
+      overlay.</description>
+    <slides deck="unroll" first="6" last="6"/>
+  </demo>
+
+  <!-- Not demos: a setup guide, and notes on choosing a project. -->
+  <hide id="setup"/>
+  <hide id="project"/>
+</demos>
