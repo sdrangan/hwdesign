@@ -164,8 +164,8 @@ test_vectors/*
 # Ignore extra directory
 extra/
 
-# Powerpoint temporary files
-~$*.pptx
+# Office lock files (PowerPoint, Word, Excel), left while a file is open
+~$*
 
 # Pipeline project
 **/pipeline/poly_uf*
