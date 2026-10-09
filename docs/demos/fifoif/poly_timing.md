@@ -225,15 +225,32 @@ scratch.
 
 ## At 64 bits
 
-At 64 bits, with `--kernel poly64` or `--word-bw 64`, the kernel works: C
-simulation and co-simulation pass, bit for bit. But `timing_diagram`
-currently fails on the command header.
-For a message that contains an array, as `PolyCmdHdr` does with its
-coefficients, the C++ that waveflow generates packs 64-bit words
-differently from its Python schema. The kernel and testbench both use the
-C++, so they agree with each other, but the Python decoder misreads the
-header off the wires. This is a known waveflow bug. Until it is fixed,
-run the 64-bit builds through `verify_cosim` only.
+At 64 bits, with `--kernel poly64` or `--word-bw 64`, every step runs the
+same way, `timing_diagram` included. The decoder is unchanged: it passes
+`word_bw=64` to the same schemas.
+
+Two things look different on the wires:
+
+* **Two samples per word.** Each 64-bit word carries two float32 samples,
+  the first in the low 32 bits. A block of 40 samples is 20 transfers, so
+  `samples_out_cycles` is `nsamp / 2`.
+* **The command header is four words, not three.** Its fields would fit in
+  three 64-bit words, but an array always starts on a fresh word and the
+  field after it does too:
+
+  ~~~text
+  word 0:  tx_id
+  word 1:  coeffs[0] | coeffs[1]
+  word 2:  coeffs[2] | coeffs[3]
+  word 3:  nsamp
+  ~~~
+
+  This is waveflow's word layout rule. It keeps the array's elements
+  packed evenly into words, so the kernel can move one word per clock.
+
+The three transactions take 61, 103 and 84 cycles, against 83, 138 and 99
+at 32 bits. The pipeline latency is still 34 cycles: it is the datapath's
+depth, not the port's width.
 
 ## When a step fails
 

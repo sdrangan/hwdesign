@@ -23,6 +23,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+from waveflow.hw.arrayutils import read_array
+from waveflow.hw.dataschema import FloatField
+
+#: TDATA carries one float32 sample per word.
+Float32 = FloatField.specialize(bitwidth=32)
 
 
 @dataclass
@@ -53,14 +58,14 @@ def _parser(vcd_path: Path):
     vcd = VCDVCD(str(vcd_path), signals=None, store_tvs=True)
     vp = VcdParser(vcd)
     clk = vp.add_clock_signal()
-    ins, _ = vp.add_axiss_signals(name="in_stream_", short_name_prefix="in_stream")
+    ins, word_bw = vp.add_axiss_signals(name="in_stream_", short_name_prefix="in_stream")
     outs, _ = vp.add_axiss_signals(name="out_stream_", short_name_prefix="out_stream")
-    return vp, clk, ins, outs
+    return vp, clk, ins, outs, word_bw
 
 
 def decode(vcd_path: Path, nsamp: int) -> StreamTrace:
     """Read the transfers on both ports; keep the first ``nsamp`` on each."""
-    vp, clk, ins, outs = _parser(vcd_path)
+    vp, clk, ins, outs, word_bw = _parser(vcd_path)
     (burst_in,), period = vp.extract_axis_bursts(clk, ins)
     (burst_out,), _ = vp.extract_axis_bursts(clk, outs)
 
@@ -70,7 +75,9 @@ def decode(vcd_path: Path, nsamp: int) -> StreamTrace:
         kinds = np.asarray(burst["beat_type"])
         cycles = np.flatnonzero(kinds == 0)[:nsamp]
         times = burst["tstart"] + cycles * period
-        data = np.asarray(burst["data"][:nsamp]).astype(np.uint32).view(np.float32)
+        n = min(nsamp, len(burst["data"]))
+        data = np.asarray(read_array(burst["data"][:n], elem_type=Float32,
+                                     word_bw=word_bw, shape=n).val, dtype=np.float32)
         stalls = int(np.sum(kinds[: cycles[-1] + 1] != 0)) if cycles.size else 0
         return times, data, stalls
 
@@ -85,17 +92,6 @@ def decode(vcd_path: Path, nsamp: int) -> StreamTrace:
 
 
 _TEAL, _PURPLE = "#00857C", "#57068C"
-
-
-def _as_float(label: str) -> str:
-    """Relabel a TDATA value, given as a decimal integer, as the float32 it holds.
-
-    Decoded here rather than by setting the parser's ``numeric_type`` to
-    ``"float"``, which byte-swaps the word on a little-endian machine.
-    """
-    if not label.isdigit():
-        return label  # X or Z
-    return f"{np.array([int(label)], dtype=np.uint32).view(np.float32)[0]:.2f}"
 
 
 def _crop(sig, t0: float, t1: float):
@@ -115,8 +111,6 @@ def _crop(sig, t0: float, t1: float):
     idx = ([before[-1]] if before.size else []) + list(keep)
     new_times = [max(float(times[i]), t0) for i in idx]
     values = [sig.values[i] for i in idx]
-    if sig.name.endswith("TDATA"):
-        values = [_as_float(v) for v in values]
     return SigTimingInfo(sig.name, new_times, values, is_clock=sig.is_clock)
 
 
@@ -138,11 +132,10 @@ def write_timing_diagram(vcd_path: Path, png_path: Path, trace: StreamTrace, *,
 
     vp, *_ = _parser(vcd_path)
     for sig in vp.sig_info.values():
-        # TDATA is a float32.  Read the word as a plain integer here; _crop
-        # relabels it with the float value.
+        # TDATA is a float32: label it with the value, not the bits.
         if sig.short_name.endswith("TDATA"):
-            sig.numeric_type = "uint"
-            sig.numeric_fmt_str = "%d"
+            sig.numeric_type = "float"
+            sig.numeric_fmt_str = "%.2f"
 
     t0, t1 = trange
     td = TimingDiagram()

@@ -102,16 +102,6 @@ def decode(vcd_path: Path, ntxn: int) -> Trace:
             f"The VCD has {len(bursts_in)} input and {len(bursts_out)} output bursts; "
             f"{ntxn} transactions need {2 * ntxn} and {3 * ntxn}.")
 
-    mask = (1 << word_bw) - 1
-
-    def words(b):
-        # The parser reads TDATA as a *signed* integer, so a word with its top
-        # bit set comes back negative; masking to the port width restores the
-        # bits.  The result is a uint64 array rather than a list, because
-        # read_array converts a list of Python ints through float64, which
-        # corrupts the low half of a 64-bit word.
-        return np.array([int(w) & mask for w in b["data"]], dtype=np.uint64)
-
     def span(port, kind, k, b, label):
         kinds = b["beat_type"]
         t0 = float(b["tstart"]) - period
@@ -124,14 +114,16 @@ def decode(vcd_path: Path, ntxn: int) -> Trace:
         b_cmd, b_x = bursts_in[2 * k], bursts_in[2 * k + 1]
         b_rh, b_y, b_rf = bursts_out[3 * k: 3 * k + 3]
 
-        cmd = PolyCmdHdr().deserialize(words(b_cmd), word_bw=word_bw)
+        # TDATA comes back as signed int64 words; deserialize takes them as
+        # they are, at either word width.
+        cmd = PolyCmdHdr().deserialize(b_cmd["data"], word_bw=word_bw)
         nsamp = int(cmd.nsamp)
-        x = np.asarray(read_array(words(b_x), elem_type=Float32, word_bw=word_bw,
+        x = np.asarray(read_array(b_x["data"], elem_type=Float32, word_bw=word_bw,
                                   shape=nsamp).val, dtype=np.float32)
-        rh = PolyRespHdr().deserialize(words(b_rh), word_bw=word_bw)
-        y = np.asarray(read_array(words(b_y), elem_type=Float32, word_bw=word_bw,
+        rh = PolyRespHdr().deserialize(b_rh["data"], word_bw=word_bw)
+        y = np.asarray(read_array(b_y["data"], elem_type=Float32, word_bw=word_bw,
                                   shape=nsamp).val, dtype=np.float32)
-        rf = PolyRespFtr().deserialize(words(b_rf), word_bw=word_bw)
+        rf = PolyRespFtr().deserialize(b_rf["data"], word_bw=word_bw)
 
         t = Txn(k, cmd, x, rh, y, rf)
         t.bursts = [

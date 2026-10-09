@@ -87,18 +87,13 @@ testbench as `-DWORD_BW=...`. A 32-bit word carries one float sample; a
 64-bit word carries two, and the kernel evaluates both at once. The
 kernel's only dependence on the width is `pf`, the samples per word. The
 generated headers handle the rest: the command header is 6 words at 32
-bits and fewer at 64.
+bits and 4 at 64.
 
-**Known issue at 64 bits.** At `WORD_BW=64` the flow passes through
-`verify_cosim`, but `timing_diagram` fails on the command header. For a
-message that contains an array, waveflow's generated C++ currently packs
-64-bit words differently from its Python schema, so the Python decoder
-misreads `PolyCmdHdr` off the wires. The kernel and testbench are
-unaffected, since both use the C++. The bug is written up in the pysilicon
-repo as `plans/stream_array_alignment.md`. `poly64.cpp` unpacks the
-command header by hand, in the layout the generated C++ uses today:
-`[tx_id] [c0|c1] [c2|c3] [nsamp]`. If the fix changes that layout,
-`poly64.cpp` has to change with it.
+At 64 bits the command header is `[tx_id] [c0|c1] [c2|c3] [nsamp]`: an
+array starts on a fresh word, and so does the field after it. This is
+waveflow's word layout rule, and the generated C++ and the Python schema
+both follow it. `poly64.cpp` unpacks the command header by hand in this
+layout.
 
 The test-vector files are sequences of 32-bit words, whatever the stream
 width. The testbench packs them into stream words itself.
