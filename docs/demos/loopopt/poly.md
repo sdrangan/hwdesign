@@ -18,7 +18,8 @@ Here we will use the pipelining to optimize the loop over the iteration `k`.
 
 ## Implementation
 
-The main code is in the [jupyter notebook](https://github.com/sdrangan/hwdesign/blob/main/demos/pipeline/pipeline_demo.ipynb).
+> **This demo is being reworked.** Its code has been taken down while it is
+> updated for this term, so the walkthrough below has no code to run yet.
 
 The example follows the same protocol as in the command-fifo example:
 

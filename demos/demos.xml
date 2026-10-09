@@ -31,20 +31,6 @@
       offsets, with a C testbench and a notebook.</description>
   </demo>
 
-  <demo id="conv2d" title="2-D convolution in Vitis HLS">
-    <description>A 2-D convolution kernel in Vitis HLS, in a plain and a
-      dataflow version, driven by command and response streams, with a C
-      testbench, Tcl builds and a timing analysis.</description>
-    <slides deck="arrays"/>
-  </demo>
-
-  <demo id="histogram" title="Histogram over AXI4 shared memory">
-    <description>A Vitis HLS histogram that reads its data over an m_axi
-      shared-memory port and takes commands on an AXI4-Stream, with a C
-      testbench and a Python driver.</description>
-    <slides deck="sharedmem" first="40" last="46"/>
-  </demo>
-
   <demo id="vector_mult" title="Vector multiply with loop unrolling">
     <description>Element-wise vector multiplication in Vitis HLS over m_axi
       ports, with a script that sweeps the unroll factor, and a PYNQ

@@ -6,7 +6,8 @@ Generated 2026-06-23 by scanning tracked files for `xilinxutils` / `pysilicon` /
 
 **Status values:** `todo` (default) · `integrated` (reworked onto current
 waveflow & verified) · `deferred` (intentionally left broken for now, doc
-bannered) · `deleted`.
+bannered) · `deleted` · `archived` (removed from this repo unmigrated and
+parked in the private `hwdesign-soln/archive/`, to be reworked or dropped there).
 
 **Reference counts** are *matching-line* counts: `x` = xilinxutils, `p` =
 pysilicon. (Regenerate with `git grep -c -i -e <term>`.)
@@ -78,9 +79,9 @@ for that unit; the demo/lab rows are the runnable material.
 | File | refs | category | status | integration notes |
 |---|---|---|---|---|
 | [units/unit06_timing/figs/timing_figs.ipynb](../units/unit06_timing/figs/timing_figs.ipynb) | x:4 | dead-xilinxutils | todo | (note: figs also modified in working tree) |
-| [demos/pipeline/view_timing.ipynb](../demos/pipeline/view_timing.ipynb) | x:9 | dead-xilinxutils | todo | |
-| [demos/pipeline/poly_demo.py](../demos/pipeline/poly_demo.py) | x:4 | dead-xilinxutils | todo | |
-| [demos/pipeline/pipeline_demo.ipynb](../demos/pipeline/pipeline_demo.ipynb) | p:11 | live-pysilicon | todo | `demos/pipeline` is **mixed** (x+p) |
+| [demos/pipeline/view_timing.ipynb](../demos/pipeline/view_timing.ipynb) | x:9 | dead-xilinxutils | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
+| [demos/pipeline/poly_demo.py](../demos/pipeline/poly_demo.py) | x:4 | dead-xilinxutils | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
+| [demos/pipeline/pipeline_demo.ipynb](../demos/pipeline/pipeline_demo.ipynb) | p:11 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there. `demos/pipeline` is **mixed** (x+p) |
 | [units/unit06_timing/timing.pdf](../units/unit06_timing/timing.pdf) | x:2 | dead-xilinxutils | deferred | binary PDF — text mentions only; regenerate, don't edit |
 
 ### unit07_loopopt
@@ -102,20 +103,20 @@ for that unit; the demo/lab rows are the runnable material.
 ### unit10_arrays — conv2d & histogram (heavy array/memory demos)
 | File | refs | category | status | integration notes |
 |---|---|---|---|---|
-| [demos/conv2d/conv2d_demo.py](../demos/conv2d/conv2d_demo.py) | p:13 | live-pysilicon | todo | big example; `hw.arrayutils` / `hw.dataschema` |
-| [demos/conv2d/conv2d_test.ipynb](../demos/conv2d/conv2d_test.ipynb) | p:6 | live-pysilicon | todo | |
-| [demos/conv2d/timing_analysis.py](../demos/conv2d/timing_analysis.py) | p:3 | live-pysilicon | todo | |
-| [demos/conv2d/view_timing.ipynb](../demos/conv2d/view_timing.ipynb) | p:2 | live-pysilicon | todo | |
-| [demos/conv2d/run.tcl](../demos/conv2d/run.tcl) | p:18 | live-pysilicon | todo | TCL include paths → waveflow-generated headers |
-| [demos/conv2d/run_df.tcl](../demos/conv2d/run_df.tcl) | p:19 | live-pysilicon | todo | TCL include paths |
-| [demos/conv2d/conv2d.cpp](../demos/conv2d/conv2d.cpp) | p:1 | live-pysilicon | todo | C++ include of vendored header |
-| [demos/conv2d/conv2d_df.cpp](../demos/conv2d/conv2d_df.cpp) | p:1 | live-pysilicon | todo | |
-| [demos/conv2d/conv2d_tb.cpp](../demos/conv2d/conv2d_tb.cpp) | p:3 | live-pysilicon | todo | |
-| [demos/histogram/hist_demo.py](../demos/histogram/hist_demo.py) | p:17 | live-pysilicon | todo | |
-| [demos/histogram/view_timing.ipynb](../demos/histogram/view_timing.ipynb) | p:2 | live-pysilicon | todo | |
-| [demos/histogram/run.tcl](../demos/histogram/run.tcl) | p:18 | live-pysilicon | todo | TCL include paths |
-| [demos/histogram/hist.cpp](../demos/histogram/hist.cpp) | p:1 | live-pysilicon | todo | |
-| [demos/histogram/hist_tb.cpp](../demos/histogram/hist_tb.cpp) | p:1 | live-pysilicon | todo | |
+| [demos/conv2d/conv2d_demo.py](../demos/conv2d/conv2d_demo.py) | p:13 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there. big example; `hw.arrayutils` / `hw.dataschema` |
+| [demos/conv2d/conv2d_test.ipynb](../demos/conv2d/conv2d_test.ipynb) | p:6 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
+| [demos/conv2d/timing_analysis.py](../demos/conv2d/timing_analysis.py) | p:3 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
+| [demos/conv2d/view_timing.ipynb](../demos/conv2d/view_timing.ipynb) | p:2 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
+| [demos/conv2d/run.tcl](../demos/conv2d/run.tcl) | p:18 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there. TCL include paths → waveflow-generated headers |
+| [demos/conv2d/run_df.tcl](../demos/conv2d/run_df.tcl) | p:19 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there. TCL include paths |
+| [demos/conv2d/conv2d.cpp](../demos/conv2d/conv2d.cpp) | p:1 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there. C++ include of vendored header |
+| [demos/conv2d/conv2d_df.cpp](../demos/conv2d/conv2d_df.cpp) | p:1 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
+| [demos/conv2d/conv2d_tb.cpp](../demos/conv2d/conv2d_tb.cpp) | p:3 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
+| [demos/histogram/hist_demo.py](../demos/histogram/hist_demo.py) | p:17 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
+| [demos/histogram/view_timing.ipynb](../demos/histogram/view_timing.ipynb) | p:2 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
+| [demos/histogram/run.tcl](../demos/histogram/run.tcl) | p:18 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there. TCL include paths |
+| [demos/histogram/hist.cpp](../demos/histogram/hist.cpp) | p:1 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
+| [demos/histogram/hist_tb.cpp](../demos/histogram/hist_tb.cpp) | p:1 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
 
 > **Note on `.tcl` / `.cpp` / `.h` rows:** these reference the vendored
 > `pysilicon/build/*` headers (array_utils.h, memmgr.hpp, streamutils) and include
@@ -129,9 +130,9 @@ for that unit; the demo/lab rows are the runnable material.
 | labs/cubic/partial/cubic.ipynb | x:1 | dead-xilinxutils | **deleted** | ✅ 2026-09-17 — the whole `cubic` lab was rebuilt on labkit + the build DAG, in the same shape as `subc` and `prng`. The notebook is gone: the Python half is now `cubic_model.py` + `cubic_eval.py`, and the student tree is generated from the annotated solution rather than hand-maintained. The import moved to `waveflow.utils.fixputils` (`truncate`/`saturate`, same signatures — the `Format` API would hide the manual `>>fbits` scaling the lab teaches, as in `demos/fixp`). The `sv_sim --source ... --tb ...` invocations the doc references lived in are retired: students run `python cubic_build.py --through svsim`, and `--through svsing` for the single-case bench. `docs/labs/cubic/test.md` was folded into `sv.md` and deleted. Lab is now free of xilinxutils. |
 | [docs/labs/cubic/sim_sing.md](../docs/labs/cubic/sim_sing.md) | x:2 | dead-xilinxutils | **integrated** | Same rebuild as the row above. |
 | docs/labs/cubic/test.md | x:2 | dead-xilinxutils | **deleted** | Folded into `docs/labs/cubic/sv.md` by the same rebuild. |
-| [labs/intersect/partial/line_inter.ipynb](../labs/intersect/partial/line_inter.ipynb) | p:6 | live-pysilicon | todo | |
-| [labs/intersect/run_hls.tcl](../labs/intersect/run_hls.tcl) | p:3 | live-pysilicon | todo | TCL include paths |
-| [docs/labs/intersect/csynth.md](../docs/labs/intersect/csynth.md) | p:1 | live-pysilicon | todo | |
+| [labs/intersect/partial/line_inter.ipynb](../labs/intersect/partial/line_inter.ipynb) | p:6 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
+| [labs/intersect/run_hls.tcl](../labs/intersect/run_hls.tcl) | p:3 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there. TCL include paths |
+| [docs/labs/intersect/csynth.md](../docs/labs/intersect/csynth.md) | p:1 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
 | [docs/labs/subc/sv.md](../docs/labs/subc/sv.md) | x:2 | dead-xilinxutils | **integrated** | ✅ 2026-09-15 — the whole `subc` lab was rebuilt on labkit + the build DAG (see `plans/subc_lab.md`), which retired the `sv_sim --source ... --tb ...` invocation these two references lived in. Students now run `python subc_build.py --through svsim` and the build calls `waveflow.scripts.sv_sim.run_sv_sim` itself. Lab docs are now free of xilinxutils. |
 | _labs/rootsolve_ | — | — | — | no old refs found; verify at integration |
 
@@ -139,8 +140,8 @@ for that unit; the demo/lab rows are the runnable material.
 | File | refs | category | status | integration notes |
 |---|---|---|---|---|
 | [docs/projects/planning.md](../docs/projects/planning.md) | p:1 | live-pysilicon | todo | |
-| [docs/projects/example_projects/conv2d/evaluation.md](../docs/projects/example_projects/conv2d/evaluation.md) | p:1 | live-pysilicon | todo | |
-| [docs/projects/example_projects/conv2d/ipdefinition.md](../docs/projects/example_projects/conv2d/ipdefinition.md) | p:1 | live-pysilicon | todo | |
+| [docs/projects/example_projects/conv2d/evaluation.md](../docs/projects/example_projects/conv2d/evaluation.md) | p:1 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
+| [docs/projects/example_projects/conv2d/ipdefinition.md](../docs/projects/example_projects/conv2d/ipdefinition.md) | p:1 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
 
 ## Support / install docs (→ folds into Getting Started, Docs track)
 | File | refs | category | status | integration notes |
