@@ -47,6 +47,7 @@ _build.sw/
 .autopilot/
 *.aps
 *.directive
+.hls.failed
 syn/
 impl/
 .debug/
