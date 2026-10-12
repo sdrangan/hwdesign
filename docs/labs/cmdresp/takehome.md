@@ -19,13 +19,31 @@ Choose something that interests you, at the right size:
 * **Too large:** an FFT, or anything you could not check by hand on a small
   input.
 * **About right:** a FIR filter, a running statistic (mean, variance, min/max
-  over a window), a histogram, a small matrix-vector product, or a piecewise
-  function with programmable breakpoints.
+  over a window), a histogram, a small matrix-vector product, a 2-D max pool
+  with non-overlapping windows, or a piecewise function with programmable
+  breakpoints.
 
-The operation must need **at least two command types that do different things
-to the kernel's state or output**, besides `END`. For example, `CONFIG` followed
-by any number of `PROCESS` commands, or `PROCESS` plus a `STATUS` command that
-reports counters.
+You have not covered pipelining yet, so you cannot tell in advance which of
+these is easy to build at full speed and which is hard. That is fine: the
+grader's feedback on your prompt will warn you if what you ask for is far
+beyond the course, and a target you miss costs nothing if it is reported
+honestly (below).
+
+The operation's parameters (sizes, strides, coefficients, modes) travel on the
+stream, in one of two ways:
+
+* **In the header of the command that uses them.** A 2-D max pool can carry the
+  image size and the window size in every `COMPUTE` header, so one data
+  command and `END` are enough.
+* **In a separate configuration command.** A FIR filter sends its taps once in
+  `CONFIG`, and every `PROCESS` command after it uses them. This is the right
+  choice when the configuration is large or state carries from one command to
+  the next.
+
+Either way, the prompt says which parameter values are invalid (a zero-sized
+window, a window larger than the image, a size too large for the kernel's
+buffers) and
+which error code each raises.
 
 Decide whether your data is floating point or fixed point. Floating point is
 easier. Fixed point means you must specify the formats, the rounding and the
@@ -49,25 +67,34 @@ agent to:
 The agent does not need to build a timing model in Python; co-simulation timing
 is enough.
 
-The prompt must specify:
+Keep the prompt short. The agent can choose command codes, header layouts, how
+values pack into words, and file formats on its own, and it keeps them
+consistent between the model, the kernel and the testbench. Spend your words on
+what it cannot know or check:
 
-* **The data:** the input and output data and their formats.
-* **The operation:** precisely. If it is fixed point, give the formats, the
-  rounding and the saturation.
-* **The commands:** every command type, its code and its header fields.
-* **The responses:** what the kernel sends back on the stream for each command,
-  including the response header format.
-* **The errors:** every error case and its code in the status registers.
-* **Targets:** the part (`xc7z020clg400-1`), the clock (10 ns), the stream
-  width, and a throughput target you choose. The agent reports whether each one
-  is met.
-* **Model verification:** how the Python model is checked independently of
-  itself, for example hand-computed worked examples, or comparison against a
-  NumPy reference. A model checked only against itself proves nothing.
-* **Test cases:** scenarios that cover every command and every error case, and
-  the ones used to measure timing. Each error ends its activation and is
-  followed by a fresh activation that must work.
-* **The results:** what goes in `results.md` (below).
+* **What the operation means**, precisely enough to work an example by hand:
+  the formula, the boundary behavior, and what state carries from one command
+  to the next. A guess here is consistent with itself, so every test passes
+  and nothing tells you it is wrong.
+* **What the application requires:** the data formats (for fixed point, the
+  rounding and the saturation), the largest sizes the hardware must handle
+  (the largest image, window or tap count, which set the size of its buffers),
+  and a throughput or latency target. The agent has no way to know these. The
+  part and the clock come from the reference example, so you do not need to
+  name them. The target is something to measure against, not something you
+  must meet: the agent reports it as met or not, and a miss reported honestly
+  costs nothing.
+* **The course pattern:** parameters travel on the stream, in the command that
+  uses them or in a configuration command; which values are invalid; and on an
+  error, the kernel reports it in the status registers, closes its output
+  burst and returns.
+* **An independent check of the model:** a few hand-computed examples, or a
+  NumPy or SciPy reference. A model checked only against itself proves
+  nothing. For a 2-D max pool, for example, NumPy has no pooling function, but
+  a `reshape` followed by `max` gives one in a line.
+* **The scenarios an agent would not think of:** sizes at your limits, a
+  change of parameters between commands within one activation, and each
+  error followed by a fresh activation that must work.
 
 The prompt must also ask the agent to **list every place the prompt was silent
 or ambiguous, and what it chose**. Every item on that list is a decision you
@@ -90,8 +117,19 @@ before you start the agent.
 
 1. In your course repository, create `cmdresp/takehome/` and put `prompt.md` in
    it. Commit and push it **before** the first agent run.
-2. Run the agent in that folder, with the same message as in class but without
-   the instruction to stop after C simulation.
+2. Run the agent in that folder, and give it this message:
+
+   > Build the accelerator specified in prompt.md, in this folder, with
+   > Waveflow: its MCP server is available, and its stream_inband example is
+   > the reference design to follow. Run C simulation, co-simulation and
+   > synthesis, and write results.md. Report the achieved II, latency and
+   > estimated clock as measured. If a target is missed, report it as a FAIL;
+   > do not restructure the kernel to meet it, and do not build a timing model
+   > in Python.
+
+   The last two sentences keep the run to the size of this project. Without
+   them, an agent that misses a target may spend an hour restructuring the
+   kernel to close timing, which is a skill this course has not covered yet.
 3. Read `results.md` and the agent's list of open decisions. Revise the prompt
    to close the ones that matter, and run again. Revising the prompt after
    seeing what the agent does is the main skill this project teaches.
@@ -115,9 +153,8 @@ before you start the agent.
 agent to put in it:
 
 * a results table: criterion, target, measured value, PASS or FAIL, and the
-  file each number came from;
-* the word layout of every message;
-* the timing and synthesis results;
+  file each number came from, with timing from co-simulation and resources
+  from synthesis;
 * the list of open decisions, and what was chosen for each;
 * anything that does not meet the spec, stated as a FAIL.
 
