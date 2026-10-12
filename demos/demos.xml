@@ -13,6 +13,17 @@
      option in hwdesign-soln.  Schema: llmgrader/schemas/llmgrader_demos.xsd in the
      llmgrader repo. -->
 <demos>
+  <!-- The labs (docs/labs/<lab>/ with labs/<lab>/).  No slide cites them, so
+       each gets its unit here. -->
+  <demo id="prng"><unit>Unit 1:  Data Types and Combinational Logic</unit></demo>
+  <demo id="subc"><unit>Unit 2:  Sequential Logic and FSMs</unit></demo>
+  <demo id="cubic"><unit>Unit 3:  Floating and Fixed-Point</unit></demo>
+  <demo id="rootsolve"><unit>Unit 4:  Memory and Processor Interfaces</unit></demo>
+  <demo id="cmdresp">
+    <unit>Command-Response Mini-Project</unit>
+    <unit>Unit 5:  FIFOs and Streaming Interfaces</unit>
+  </demo>
+
   <!-- Combinational SystemVerilog: integer widths, overflow, bit packing. -->
   <demo id="datatypes"><slides deck="basic-logic"/></demo>
 
