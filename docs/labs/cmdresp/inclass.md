@@ -40,18 +40,21 @@ Write `prompt.md` for your operation, following the
   and **stop once C simulation passes**: no synthesis or co-simulation today;
 * write `results.md` (below).
 
-And it must specify:
+Keep the rest short. The agent can choose command codes, header fields,
+response layouts and file formats on its own, and it keeps them consistent.
+Specify what it cannot know or check:
 
-* **the commands:** each command type, its code, and its header fields;
-* **the responses:** what the kernel sends back for each command;
-* **the errors:** each error case and its code in the status registers,
-  including a `DATA` command before any `CONFIG`, a sample burst whose TLAST
-  comes early, and one whose TLAST is missing;
-* **the test cases:** the scenarios C simulation runs. Each error ends its
-  activation, and is followed by a fresh activation that must work;
-* **the results:** what goes in `results.md`. At least a table of every
-  scenario with PASS or FAIL, and **a list of every place the prompt was silent
-  or ambiguous, and what the agent chose**.
+* **the operation, exactly:** including anything that changes the output, such
+  as float arithmetic order, and what a second `CONFIG` resets;
+* **the errors:** a `DATA` command before any `CONFIG`, a sample burst whose
+  TLAST comes early, and one whose TLAST is missing, reported in the status
+  registers; and what the kernel does on an error, as in the
+  [pattern](./pattern.md);
+* **the checks:** a few hand-computed examples for the Python model, and a
+  fresh activation after each error scenario that must work;
+* **the review:** in `results.md`, a table of every scenario with PASS or
+  FAIL, and **a list of every place the prompt was silent or ambiguous, and
+  what the agent chose**.
 
 Paste your prompt into the LLM grader (**Command-Response Mini-Project**, part 1)
 and revise it with the feedback. Two or three rounds is typical.
@@ -59,8 +62,8 @@ and revise it with the feedback. Two or three rounds is typical.
 ### Trade prompts
 
 Swap prompts with another pair. Read theirs as if you were the agent, and write
-down every decision it leaves to you: What does `CONFIG` send back, if anything?
-What happens with `nsamp = 0`? If a header has two problems, which error code
+down every decision it leaves to you that would change an output or an error:
+Does a second `CONFIG` reset the state? What happens with `nsamp = 0`? If a header has two problems, which error code
 wins? Give them your list, and fix your own prompt with the list you get back.
 Keep the list: you will compare it with the agent's in part 2.
 

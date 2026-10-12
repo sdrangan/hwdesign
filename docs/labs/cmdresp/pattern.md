@@ -28,8 +28,9 @@ command.
 ## The rules
 
 1. **Everything the kernel computes with travels on the stream**: commands,
-   configuration (coefficients, thresholds, modes) and data. Configuration is a
-   command of its own, for example `CONFIG`.
+   configuration (coefficients, thresholds, modes) and data. Configuration is
+   either a command of its own, for example `CONFIG`, or fields in the header
+   of the command that uses it.
 2. **AXI-Lite carries only control and status.** The host starts the kernel with
    `ap_start`. The kernel processes commands until an `END` command or an error,
    then returns, and the host sees `ap_done`.
@@ -41,9 +42,9 @@ command.
 5. **After an error, the input stream's contents are undefined.** Recovery is
    the host's job: it reads the status, resets the stream path, and starts the
    kernel again.
-6. **Nothing carries over between activations.** Each activation starts clean
-   and must begin with a configuration command. A data command before any
-   configuration is an error.
+6. **Nothing carries over between activations.** Each activation starts clean.
+   If configuration is a command of its own, the activation must begin with it,
+   and a data command before any configuration is an error.
 
 ## The host and the kernel, side by side
 

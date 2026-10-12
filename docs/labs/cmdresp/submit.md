@@ -29,11 +29,13 @@ hwdesign-work/
 ## What to submit
 
 All four parts are under **Command-Response Mini-Project** in the LLM grader.
+Parts 1 and 2 are for feedback only and do not count toward your grade; parts
+3 and 4 are graded.
 
 | Part | Paste into the grader |
 | --- | --- |
-| 1. In-class prompt | The text of `cmdresp/inclass/prompt.md` |
-| 2. In-class implementation | The text of `cmdresp/inclass/results.md` |
+| 1. In-class prompt (feedback only) | The text of `cmdresp/inclass/prompt.md` |
+| 2. In-class implementation (feedback only) | The text of `cmdresp/inclass/results.md` |
 | 3. Take-home prompt | The text of `cmdresp/takehome/prompt.md` |
 | 4. Take-home implementation | The link to `cmdresp/takehome/` in your repository |
 

@@ -47,8 +47,10 @@ In going through the project, you will learn how to:
 | 3. [Prompt design](./takehome.md#part-3-prompt-design) | Take-home | Write a prompt for an accelerator of your own choosing | The prompt text |
 | 4. [Implementation](./takehome.md#part-4-implementation) | Take-home | The agent builds it through co-simulation and synthesis, and you iterate on the prompt | A link to the folder in your course repository |
 
-All four parts are graded with the LLM grader, under **Command-Response
-Mini-Project**. You can submit as many times as you like, so use the feedback.
+All four parts go through the LLM grader, under **Command-Response
+Mini-Project**. Parts 1 and 2 are for feedback only and do not count toward
+your grade; parts 3 and 4 are graded. You can submit as many times as you
+like, so use the feedback.
 
 ## Before class
 
