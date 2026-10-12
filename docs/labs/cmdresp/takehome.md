@@ -81,9 +81,11 @@ what it cannot know or check:
   (the largest image, window or tap count, which set the size of its buffers),
   and a throughput or latency target. The agent has no way to know these. The
   part and the clock come from the reference example, so you do not need to
-  name them. The target is something to measure against, not something you
-  must meet: the agent reports it as met or not, and a miss reported honestly
-  costs nothing.
+  name them. The clock target is met when Vitis's estimated clock is under
+  10 ns; its warning about a clock-uncertainty margin is not a failure. The
+  throughput target is something to measure against, not something you must
+  meet: the agent reports it as met or not, and a miss reported honestly costs
+  nothing.
 * **The course pattern:** parameters travel on the stream, in the command that
   uses them or in a configuration command; which values are invalid; and on an
   error, the kernel reports it in the status registers, closes its output
@@ -96,27 +98,35 @@ what it cannot know or check:
   change of parameters between commands within one activation, and each
   error followed by a fresh activation that must work.
 
-The prompt must also tell the agent to give `results.md` **three sections, by
-these names**, because the Part 4 grader reads them:
+The prompt must also tell the agent what to put in `results.md`, in **seven
+sections, by these names**, because the Part 4 grader reads it section by
+section:
 
-* **Assumptions:** every place the prompt was silent or ambiguous, and what the
-  agent chose. Every item here is a decision you left to the agent. In a test
-  run, even a careful prompt left a dozen of them, and some were real design
-  holes.
-* **Open Items:** questions the agent could not settle, and anything that
-  failed or was not done.
-* **Run History:** one row per run, with the prompt version, what was built or
-  changed, and what passed. This is what lets the next run, or another agent,
-  pick up where the last one stopped.
+| Section | What it holds |
+| --- | --- |
+| **Interface** | The command and response layouts, how values pack into words, the status registers and the error codes: everything a host program needs. These are choices the agent makes; this is where they are written down. |
+| **Design** | How the kernel works: the loop structure, where state is kept, and how the throughput target is reached, or why not. |
+| **Targets** | Each target with the required value, the measured value, PASS or FAIL, and the file it came from: co-simulation for timing; synthesis for clock, II and resources. |
+| **Verification** | The model's independent check, then one row per scenario: whether the model, C simulation and co-simulation agree, and for each error, the status it set and whether the fresh activation after it passed. |
+| **Assumptions** | Every place the prompt was silent or ambiguous, and what the agent chose. Each one is a decision you left to the agent; in a test run even a careful prompt left a dozen, and some were real design holes. |
+| **Open Items** | Questions the agent could not settle, and anything that failed or was not done. |
+| **Run History** | One row per run: the prompt version, what was built or changed, and what passed. This is what lets the next run, or another agent, pick up where the last one stopped. |
 
 Finally, the prompt ends with a **revision history**: a table with one row per
 version, saying what changed and why. Engineering specifications carry one, so
-that a reader can see how the design got to where it is. Start it with
-version 1:
+that a reader can see how the design got to where it is.
 
-| Version | Change | Why |
-| --- | --- | --- |
-| 1 | First version | |
+### Start from the template
+
+The course repository has a template for the prompt:
+[`labs/cmdresp/partial/prompt.md`](https://github.com/sdrangan/hwdesign/blob/main/labs/cmdresp/partial/prompt.md).
+Copy it to `cmdresp/takehome/prompt.md` in your course repository and replace
+each `TODO` with your design. The rest is already written and stays as it is:
+the instruction to follow the reference example, the error contract, running
+co-simulation once, the seven `results.md` sections, and the revision history.
+You can reorganize the design sections if your accelerator needs it, but keep
+the `results.md` section: the Part 3 grader checks that its seven sections are
+asked for by name.
 
 Paste the prompt into the LLM grader (part 3) and revise it with the feedback
 before you start the agent.
@@ -131,13 +141,15 @@ before you start the agent.
    > Waveflow: its MCP server is available, and its stream_inband example is
    > the reference design to follow. Run C simulation, co-simulation and
    > synthesis, and write results.md. Report the achieved II, latency and
-   > estimated clock as measured. If a target is missed, report it as a FAIL
-   > rather than reworking the kernel to close timing, and do not build a
-   > timing model in Python.
+   > estimated clock as measured. The clock target is met when Vitis's
+   > estimated clock is under 10 ns; a warning about its clock-uncertainty
+   > margin is not a FAIL. If a target is missed, report it as a FAIL rather
+   > than reworking the kernel to close timing, and do not build a timing
+   > model in Python.
 
-   The last sentence keeps the run to the size of this project. Without it, an
-   agent that misses a target may spend an hour restructuring the kernel to
-   close timing, which is a skill this course has not covered yet.
+   The last three sentences keep the run to the size of this project. Without
+   them, an agent that misses a target may spend an hour restructuring the
+   kernel to close timing, which is a skill this course has not covered yet.
 3. Read `results.md`, then iterate with the agent as described below until
    nothing consequential is left open.
 4. Commit and push the folder, and submit its link (part 4).
@@ -180,9 +192,11 @@ For each run:
    > the design in this folder to match the new prompt. Rerun every check the
    > change affects, through C simulation, co-simulation and synthesis, and
    > update results.md, including a new row in its Run History. Report the
-   > achieved II, latency and estimated clock as measured. If a target is
-   > missed, report it as a FAIL rather than reworking the kernel to close
-   > timing, and do not build a timing model in Python.
+   > achieved II, latency and estimated clock as measured. The clock target is
+   > met when Vitis's estimated clock is under 10 ns; a warning about its
+   > clock-uncertainty margin is not a FAIL. If a target is missed, report it
+   > as a FAIL rather than reworking the kernel to close timing, and do not
+   > build a timing model in Python.
 
    A follow-up run changes only what the revision touches, so it is usually
    much shorter than the first. It works in a new session too: everything it
@@ -194,13 +208,9 @@ first prompt that gets there in one run needs no revisions at all.
 ### What `results.md` must contain
 
 `results.md` is what gets graded, and the grader cannot run your code. Your
-prompt asks the agent for:
-
-* **Results:** a table of each target and scenario with the measured value,
-  PASS or FAIL, and the file each number came from, with timing from
-  co-simulation and resources from synthesis. Anything that does not meet the
-  spec is a FAIL.
-* **Assumptions**, **Open Items** and **Run History**, as described in Part 3.
+prompt asks the agent for the seven sections in Part 3: Interface, Design,
+Targets, Verification, Assumptions, Open Items and Run History. Anything that
+does not meet the spec is a FAIL in Targets or Verification.
 
 Commit the raw evidence `results.md` cites: the simulation logs, the comparison
 outputs and the synthesis reports. Do not commit Vitis project directories or
