@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Corrections to the course materials the LLM Grader portal serves from
+     this repo.
+
+     The course config (llmgrader_mcp_config.xml in hwdesign-soln) makes one
+     item per folder of labs/ and demos/, each paired with its docs/labs/ or
+     docs/demos/ folder, and the portal ties each to the slides and units
+     that cite it.  This file says what no slide or docs page does: a unit,
+     a title, a description, or slides to link.  It is read on every sync,
+     so a change here needs no course package rebuild; a commit whose file
+     fails the schema is not served.
+
+     An id is the folder's name, or name-kind when a deck already has the
+     name (fsm-demo).  A unit is a <name> from llmgrader_config.xml.
+     <slides deck="..."/> without first/last gives the item that deck's
+     units.  To see every item and where its units come from, run
+     llmgrader_mcp_build with its materials option in hwdesign-soln.  Schema:
+     llmgrader/schemas/llmgrader_materials.xsd in the llmgrader repo. -->
+<materials>
+  <!-- The labs.  No slide cites them, so each gets its unit here. -->
+  <item id="prng" unit="Unit 1:  Data Types and Combinational Logic"/>
+  <item id="subc" unit="Unit 2:  Sequential Logic and FSMs"/>
+  <item id="cubic" unit="Unit 3:  Floating and Fixed-Point"/>
+  <item id="rootsolve" unit="Unit 4:  Memory and Processor Interfaces"/>
+  <item id="cmdresp" unit="Command-Response Mini-Project"
+        also="Unit 5:  FIFOs and Streaming Interfaces"/>
+
+  <!-- Combinational SystemVerilog: integer widths, overflow, bit packing. -->
+  <item id="datatypes"><slides deck="basic-logic"/></item>
+
+  <!-- Its code is demos/fifoif and the poly kernel in demos/stream, which is
+       the stream demo's folder: the slides that cite poly link that one. -->
+  <item id="fifoif" unit="Unit 5:  FIFOs and Streaming Interfaces"/>
+
+  <!-- Clocked SystemVerilog modules with their testbenches. -->
+  <item id="simp_fun"><slides deck="fsm"/></item>
+
+  <item id="fsm-demo" title="Counter FSM in SystemVerilog">
+    <description>A loadable counter with a synchronous reset, written with
+      separate combinational next-state logic and clocked registers, and its
+      testbench.</description>
+  </item>
+
+  <item id="sharedmem-demo" title="Shared-memory accelerator in Vitis HLS">
+    <description>A Vitis HLS accelerator that takes commands and reads and
+      writes a shared-memory image over an AXI master port, addressed by word
+      offsets, with a C testbench and a notebook.</description>
+  </item>
+
+  <item id="vector_mult" title="Vector multiply with loop unrolling">
+    <description>Element-wise vector multiplication in Vitis HLS over m_axi
+      ports, with a script that sweeps the unroll factor, and a PYNQ
+      overlay.</description>
+    <slides deck="unroll" first="6" last="6"/>
+  </item>
+</materials>
