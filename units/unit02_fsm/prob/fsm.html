@@ -55,7 +55,7 @@ end
 </code></pre>
 
         <p>
-        Starting from \( (x,v) = (15,10)\), what are the values of 
+        Starting from \( (x,v) = (15,10)\), what are the values of
         \( (x,v) \) for the next 5 clock cycles?
         </p>
         
@@ -66,12 +66,14 @@ end
         <p>Consider the following SystemVerilog code:</p>
 
         <pre><code>always_ff @(posedge clk) begin
-    x1 <= ((5*x1 + 3*x2)>>3);
-    x2 <= ((4*x1 - 4*x2)>>3);
+    x1 <= ((5*x1 + 3*x2) >>> 3);
+    x2 <= ((4*x1 - 4*x2) >>> 3);
 end
 </code></pre>
 
-        <p>Here <code>&gt;&gt;3</code> denotes a right shift by 3 bits (division by 8), and all values are 32‑bit signed integers.</p>
+        <p>Here <code>&gt;&gt;&gt;3</code> denotes an arithmetic right shift
+        by 3 bits (floor division by 8), and <code>x1</code> and
+        <code>x2</code> are declared <code>logic signed [31:0]</code>.</p>
 
         <ol type="a">
             <li>Suppose that \((x_1,x_2) = (8,0)\). What is the value of \((x_1,x_2)\) in the next clock cycle? Remember that assignments (<code>&lt;=</code>) are non‑blocking, so they update in parallel.</li>
@@ -209,7 +211,7 @@ end
                 Write SystemVerilog code that computes <code>y</code>.
                 The output should always be produced exactly <strong>two cycles</strong> after the input,
                 even when \(i = 0\), \(1\), \(2\), or \(3\).
-                If two multiplications are in the same clock cycle, they must be parallelizable. 
+                If two multiplications are in the same clock cycle, they must be parallelizable.
                 You do not need to include the module declaration, or declaration
                 of variables; just the <code>always_ff</code> and <code>always_comb</code> blocks.
             </p>
