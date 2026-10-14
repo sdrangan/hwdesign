@@ -14,12 +14,16 @@ carried all the way through co-simulation and synthesis.
 
 Choose something that interests you, at the right size:
 
-* **Too small:** anything as simple as the in-class menu, or anything with no
-  state and no configuration.
+* **Too small:** an in-class menu item, a copy of something built in class
+  (including the cubic-function IP from lecture), or a single arithmetic
+  operation per element such as adding, scaling or summing. Small is fine
+  otherwise: a stateless or elementwise kernel is a good choice if its prompt
+  has to settle formats, rounding, saturation or boundary behavior, for example
+  a 1-D max pool, a quantizer or a QAM soft demapper.
 * **Too large:** an FFT, or anything you could not check by hand on a small
   input.
-* **About right:** a FIR filter, a running statistic (mean, variance, min/max
-  over a window), a histogram, a small matrix-vector product, a 2-D max pool
+* **About right:** a FIR filter, a windowed statistic (variance, min/max over
+  a window), a histogram, a small matrix-vector product, a 2-D max pool
   with non-overlapping windows, or a piecewise function with programmable
   breakpoints.
 
