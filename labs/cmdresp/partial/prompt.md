@@ -51,7 +51,9 @@ Write results.md with these sections:
   target is reached.
 - Targets: each target above with the required value, the measured value,
   PASS/FAIL and the file it came from (co-simulation for timing; synthesis
-  for clock, II and resources).
+  for clock, II and resources).  Always report the latency and throughput
+  from co-simulation and the estimated clock and resources from synthesis,
+  writing "no target" where this prompt sets none.
 - Verification: the model's check against the hand-computed examples and the
   reference; then one row per scenario saying whether the model, C simulation
   and co-simulation agree, and for each error scenario the status it set and
@@ -59,9 +61,13 @@ Write results.md with these sections:
 - Assumptions: every place this prompt was silent or ambiguous and what you
   chose, apart from interface details already given under Interface.
 - Open Items: questions you could not settle, and anything that failed or was
-  not done.
+  not done, or "None".
 - Run History: one row per run, with the prompt version, what was built or
   changed, and what passed, so that a later run can continue from here.
+
+Every number and PASS/FAIL in Targets and Verification names the file it came
+from (a log, a comparison output or a synthesis report), and that file stays in
+this folder to be committed: a reviewer opens them to check results.md.
 
 ## Revision history
 | Version | Change | Why |

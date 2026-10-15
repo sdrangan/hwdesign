@@ -216,6 +216,12 @@ prompt asks the agent for the seven sections in Part 3: Interface, Design,
 Targets, Verification, Assumptions, Open Items and Run History. Anything that
 does not meet the spec is a FAIL in Targets or Verification.
 
+The grader expects a file behind every number and PASS/FAIL in Targets and
+Verification: each one names the file it came from, and the grader opens some
+of those files and checks them against `results.md`. The template's last
+sentence under `results.md` asks the agent for this; keep it. The Run History
+and the prose in the other sections may repeat those numbers without sources.
+
 Commit the raw evidence `results.md` cites: the simulation logs, the comparison
 outputs and the synthesis reports. Do not commit Vitis project directories or
 bulky logs that nothing cites.
