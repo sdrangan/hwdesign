@@ -10,8 +10,8 @@ the Clock* (`docs/demos/timing/index.md`).
 
 | File | What it is |
 | --- | --- |
-| `src/quad.cpp`, `src/quad.h` | the kernel and its interface pragmas |
-| `testbench/tb_quad.cpp` | the testbench, for C simulation and co-simulation |
+| `quad.cpp`, `quad.h` | the kernel and its interface pragmas |
+| `tb_quad.cpp` | the testbench, for C simulation and co-simulation |
 | `run.tcl` | the Vitis HLS script: `csim`, `sweep` or `cosim` per invocation |
 | `golden.py` | the test vector and an independent Python model |
 | `quad_timing.py` | reads the sweep's reports, and plots them and the VCDs |
@@ -38,3 +38,18 @@ python quad_build.py --periods 10 5 2.5 --slow-ns 10 --fast-ns 2.5 --force-step 
 
 The slow and fast periods must be among the swept ones: they name the
 solutions that are simulated.
+
+## The in-class exercise: `--fast`
+
+Students rewrite the kernel to schedule in fewer cycles (*Demos › Timing
+and the Clock › In-Class Exercise*). They work on a copy, `quad_fast.cpp`,
+which `.gitignore` keeps out of the repo, and build it with `--fast`:
+
+```bash
+cp quad.cpp quad_fast.cpp                       # then edit quad_fast.cpp
+python quad_build.py --fast --periods 10 --through sweep_report
+```
+
+`--fast` runs the same build on `quad_fast.cpp` and puts everything it
+makes under `fast/`: `fast/quad_proj/p10/`, `fast/results/`, and so on,
+beside the reference build rather than over it.

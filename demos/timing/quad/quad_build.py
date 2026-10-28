@@ -1,7 +1,7 @@
 """Build script for the quad timing demo.
 
-The kernel (``src/quad.cpp``), the testbench (``testbench/tb_quad.cpp``) and
-the Vitis script (``run.tcl``) are hand-written.  This file adds the sequence:
+The kernel (``quad.cpp``), the testbench (``tb_quad.cpp``) and the Vitis
+script (``run.tcl``) are hand-written.  This file adds the sequence:
 
     make_inputs -> csim -> verify_csim -> sweep -> sweep_report ----------------------> report
                                        -> cosim_slow -> verify_cosim_slow -> vcd_slow -> timing_slow
@@ -16,6 +16,15 @@ cycles show up between ap_start and ap_done.
     python quad_build.py --force-step sweep                                      # all of them
     python quad_build.py --periods 10 5 4 3.33 2.5 --force-step sweep
 
+``--fast`` builds the student's ``quad_fast.cpp`` instead of ``quad.cpp``, for
+the in-class exercise: copy ``quad.cpp`` to ``quad_fast.cpp``, rewrite it to
+schedule in fewer cycles, and run
+
+    python quad_build.py --fast --periods 10 --through timing_slow
+
+Everything that build makes goes under ``fast/`` (``fast/quad_proj/p10``,
+``fast/results/``, ...), beside the reference build rather than over it.
+
 Steps are skipped when their inputs have not changed; ``--list-steps``
 prints the sequence.  Requires the ``hwdesign-venv`` environment (the one
 with ``waveflow``) and an installed Vitis HLS.
@@ -24,6 +33,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
@@ -53,14 +63,25 @@ DEFAULT_PERIODS = [20.0, 10.0, 6.67, 5.0, 4.0, 3.33, 2.5]
 #: 100 MHz takes 2 cycles and 300 MHz 9, the fastest that meets timing.
 DEFAULT_SLOW_NS, DEFAULT_FAST_NS = 10.0, 3.33
 
+#: The kernel source, and the --fast one: the student's own copy, not tracked.
+KERNEL, FAST_KERNEL = "quad.cpp", "quad_fast.cpp"
+#: Where a --fast build puts everything it makes.
+FAST_DIR = "fast"
+
 
 def _run_stage(config: BuildConfig, stage: str, out_dir: Path, *,
                live_output: bool = False, **env_extra) -> None:
-    """Invoke ``run.tcl`` for one stage."""
+    """Invoke ``run.tcl`` for one stage.
+
+    The script and the sources are read from beside this file; Vitis runs in
+    the build root, ``config.root_dir``, so its project lands there.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
-    env = {"QUAD_STAGE": stage, "QUAD_OUT_DIR": out_dir.as_posix(), **env_extra}
+    config.root_dir.mkdir(parents=True, exist_ok=True)
+    env = {"QUAD_STAGE": stage, "QUAD_OUT_DIR": out_dir.as_posix(), "QUAD_KERNEL": KERNEL,
+           **env_extra}
     try:
-        result = toolchain.run_vitis_hls(config.root_dir / "run.tcl", work_dir=config.root_dir,
+        result = toolchain.run_vitis_hls(_SOURCE_DIR / "run.tcl", work_dir=config.root_dir,
                                          capture_output=not live_output, env=env)
     except Exception as exc:
         # The tool's own output says why; without it a failure is just an exit code.
@@ -200,17 +221,24 @@ class CoSimStep(BuildStep):
         (out_dir / "cases.txt").write_bytes(Path(cases).read_bytes())
         solution = quad_timing.solution_name(period)
         try:
-            try:
-                _run_stage(config, "cosim", out_dir, live_output=live_output,
-                           QUAD_SOLUTION=solution)
-            except RuntimeError:
-                # The first co-simulation after a fresh synthesis sometimes
-                # fails at once, at "Instrumenting C test bench", with "file
-                # generation failed" and nothing in its logs; the same command
-                # then passes.  So one retry before giving up.
-                print(f"Co-simulation of {solution} failed; retrying once.")
-                _run_stage(config, "cosim", out_dir, live_output=live_output,
-                           QUAD_SOLUTION=solution)
+            # Co-simulation sometimes fails within seconds, at "Instrumenting C
+            # test bench", with "file generation failed".  What fails is the
+            # clang-tidy pass that rewrites sim/autowrap/testbench/
+            # tb_quad.cpp_pre.cpp.tb.cpp: it runs, but the rewritten file is
+            # never written, as if the freshly created file were locked
+            # (Windows antivirus or an editor are the usual suspects).  An
+            # immediate retry fails the same way and a later one passes, so
+            # wait between attempts.
+            for wait_s in (15, 30, None):
+                try:
+                    _run_stage(config, "cosim", out_dir, live_output=live_output,
+                               QUAD_SOLUTION=solution)
+                    break
+                except RuntimeError:
+                    if wait_s is None:
+                        raise
+                    print(f"Co-simulation of {solution} failed; retrying in {wait_s} s.")
+                    time.sleep(wait_s)
         except RuntimeError:
             # Freshness is decided by file times, so a results directory left
             # behind by a failed run would pass as done on the next build.
@@ -321,8 +349,8 @@ _RESULTS_MANIFEST = [{"filename": "results.json", "compare_fields": ["y"]}]
 
 def build_quad_dag() -> BuildDag:
     dag = BuildDag()
-    for artifact, path in (("quad_cpp", "src/quad.cpp"), ("quad_h", "src/quad.h"),
-                           ("quad_tb", "testbench/tb_quad.cpp"), ("run_tcl", "run.tcl"),
+    for artifact, path in (("quad_cpp", KERNEL), ("quad_h", "quad.h"),
+                           ("quad_tb", "tb_quad.cpp"), ("run_tcl", "run.tcl"),
                            ("golden_py", "golden.py"), ("quad_timing_py", "quad_timing.py")):
         dag.add(SourceStep(artifact=artifact, path=_SOURCE_DIR / path))
 
@@ -348,12 +376,29 @@ def build_quad_dag() -> BuildDag:
 
 
 def main() -> None:
+    global KERNEL
+    # --fast is read before the CLI proper, because it decides the build root,
+    # which the CLI takes as given.
+    import argparse
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument("--fast", action="store_true")
+    fast = pre.parse_known_args()[0].fast
+    root = _SOURCE_DIR
+    if fast:
+        if not (_SOURCE_DIR / FAST_KERNEL).is_file():
+            raise SystemExit(f"--fast builds {FAST_KERNEL}, and there is none yet.  Copy "
+                             f"{KERNEL} to {FAST_KERNEL} beside it, change the copy, and run "
+                             "this again.  The function in it must still be called quad().")
+        KERNEL, root = FAST_KERNEL, _SOURCE_DIR / FAST_DIR
+
     run_dag_cli(
         build_quad_dag,
         description="Synthesize the quadratic at several clock periods and time it.",
         default_through="report",
-        root_dir=_SOURCE_DIR,
+        root_dir=root,
         extra_args=[
+            (("--fast",), {"action": "store_true",
+                           "help": f"Build {FAST_KERNEL} instead of {KERNEL}, into {FAST_DIR}/."}),
             (("--periods",), {"type": float, "nargs": "+", "default": DEFAULT_PERIODS,
                               "metavar": "NS", "help": "Clock periods to synthesize, in ns."}),
             (("--slow-ns",), {"type": float, "default": DEFAULT_SLOW_NS,

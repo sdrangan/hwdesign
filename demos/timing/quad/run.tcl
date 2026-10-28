@@ -22,6 +22,10 @@
 #
 # written at the top of quad().
 #
+# The project, quad_proj, is created in the directory Vitis runs in, which
+# quad_build.py sets: this directory, or fast/ under --fast.  The sources are
+# always read from beside this script.
+#
 # Run a stage by hand, from this directory:
 #
 #   $env:QUAD_STAGE="sweep"; $env:QUAD_PERIODS="10 5"; vitis-run --mode hls --tcl run.tcl
@@ -41,6 +45,9 @@ set periods     [env_or QUAD_PERIODS     "20 10 6.67 5 4 3.33 2.5"]
 set solution    [env_or QUAD_SOLUTION    "p10"]
 set trace_level [env_or QUAD_TRACE_LEVEL "port"]
 set part        [env_or QUAD_PART        "xc7z020clg484-1"]
+# The kernel's source file: quad.cpp, or the student's quad_fast.cpp under
+# quad_build.py --fast.  Either way the function is quad().
+set kernel      [env_or QUAD_KERNEL      "quad.cpp"]
 
 if {$stage ni {csim sweep cosim}} {
     puts "QUAD_ERROR: unknown stage '$stage' (expected csim, sweep or cosim)."
@@ -66,9 +73,8 @@ set_top quad
 # file relative to wherever it last ran it, and the next stage's relative
 # add_files then disagreed with it: co-simulation failed at "Instrumenting C
 # test bench" whenever the stages ran in a particular order.
-set src_dir [file join $script_dir src]
-add_files [file join $src_dir quad.cpp] -cflags "-I$src_dir"
-add_files -tb [file join $script_dir testbench tb_quad.cpp] -cflags "-I$src_dir"
+add_files [file join $script_dir $kernel] -cflags "-I$script_dir"
+add_files -tb [file join $script_dir tb_quad.cpp] -cflags "-I$script_dir"
 
 file mkdir $out_dir
 
