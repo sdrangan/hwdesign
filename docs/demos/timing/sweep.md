@@ -1,13 +1,13 @@
 ---
 title: Sweeping the Clock
 parent: Timing and the Clock
-nav_order: 3
+nav_order: 5
 has_children: false
 ---
 
 # Sweeping the Clock
 
-The [previous page](synth.md) synthesized the kernel for one clock,
+[Synthesis at one clock](synth.md) synthesized the kernel for one clock,
 100 MHz, and found a latency of 2 cycles. This page asks the same question
 at seven clocks, from 50 to 400 MHz, and compares the answers.
 
@@ -76,7 +76,7 @@ def run(self, config: BuildConfig, periods, live_output, **_) -> dict:
 ```
 
 `sweep_report` then reads every solution's report, with the same
-`read_solution` function the [previous page](synth.md#reading-the-report-from-python)
+`read_solution` function that [Synthesis at one clock](synth.md#reading-the-report-from-python)
 used for one, and writes a table and a plot:
 
 ```python
@@ -113,7 +113,7 @@ and `results/sweep.png`:
 ### A faster clock takes more cycles
 
 The top left panel. Each operation takes about 4.5 ns, as the
-[schedule at 100 MHz](synth.md#the-schedule-what-happens-in-each-cycle)
+[schedule at 100 MHz](synth_sched.md)
 showed, so how many fit in a cycle depends on the cycle:
 
 - **At 50 MHz** the budget is 20 − 5.4 = 14.6 ns, and the whole chain,
@@ -126,7 +126,7 @@ showed, so how many fit in a cycle depends on the cycle:
   the registers inside each DSP block, so a multiply itself spans several
   cycles, and the three-input adder is split into its two additions, a
   cycle each. Counting the states in each solution's schedule
-  (`quad.verbose.sched.rpt`, as on the [previous page](synth.md#the-schedule-what-happens-in-each-cycle)):
+  (`quad.verbose.sched.rpt`, as on [Analyzing the schedule](synth_sched.md)):
 
   | Clock | `x*x` | `w2*xsq` | additions | states | latency |
   |---|---|---|---|---|---|
@@ -169,7 +169,7 @@ Vivado's place and route, which can be better or worse.
 ### The timing diagram at 300 MHz
 
 `timing_fast` draws the co-simulation of the 300 MHz solution, beside the
-100 MHz one from the previous page:
+100 MHz one from [Synthesis at one clock](synth.md):
 
 <img src="images/quad_timing_300mhz.png" alt="Timing diagram at 300 MHz: ap_start rises with x = 10, and ap_done rises 9 cycles later with y = 434" width="100%"/>
 

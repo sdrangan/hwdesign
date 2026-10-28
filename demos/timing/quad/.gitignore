@@ -19,3 +19,7 @@ dfx_runtime.txt
 
 # waveflow's record of each build step run.
 /.waveflow/
+
+# The in-class exercise: the student's own kernel, and everything --fast builds.
+/quad_fast.cpp
+/fast/

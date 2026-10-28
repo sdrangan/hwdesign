@@ -428,4 +428,62 @@
 % fig: quad2_crit
 \quadtwo{1}
 
+% ----------------------------------------------------------------------
+% The quad demo's kernel as Vitis HLS scheduled it at 10 ns (budget 7.3 ns
+% per state), from quad_proj/p10/.autopilot/db/quad.verbose.sched.rpt: the
+% operations in each state with their delays, and the registers between
+% states, sext_ln26 being x held for state 2.
+% fig: quad_sched
+\begin{tikzpicture}
+  \tikzset{sreg/.style={reg, minimum height=0.9cm, minimum width=0.6cm}}
+  % state boundaries and labels
+  \foreach \xb in {3.5, 7.1} \draw[dashed, muted] (\xb,1.75) -- (\xb,-3.0);
+  \node[font=\small\bfseries] at (1.75,2.15) {State 1};
+  \node[font=\small\bfseries] at (5.3,2.15) {State 2};
+  \node[font=\small\bfseries] at (8.9,2.15) {State 3};
+  \node[arr] at (1.75,1.75) {4.53 ns};
+  \node[arr] at (5.3,1.75) {4.58 ns};
+  \node[arr] at (8.9,1.75) {4.10 ns};
+  % state 1: xsq = x * x
+  \node[sig] (x) at (0,0) {x};
+  \coordinate (s) at (0.7,0);
+  \node[op] (m1) at (2.1,0) {$\times$};
+  \node[dly] at (2.1,-0.55) {4.53 ns};
+  \draw[-] (x) -- (s);
+  \node[dot] at (s) {};
+  \draw[w] (s) -- (m1);
+  \node[dot] at (1.3,0) {};
+  \draw[w] (1.3,0) |- (1.75,0.6) -| (m1.north);
+  % registers at the first boundary: xsq, and x held for state 2
+  \node[sreg] (rq) at (3.5,0) {};
+  \node[sreg] (rx) at (3.5,-2.0) {};
+  \draw[w] (m1) -- node[sig, above] {xsq} (rq.input);
+  \draw[w] (s) |- (rx.input);
+  % state 2: w2 * xsq and w1 * x, in parallel
+  \node[op] (m2) at (5.3,0) {$\times$};
+  \node[sig] (w2) at (5.3,1.0) {w2};
+  \node[dly] at (5.75,-0.5) {4.58 ns};
+  \node[op] (m3) at (5.3,-2.0) {$\times$};
+  \node[sig] (w1) at (5.3,-2.95) {w1};
+  \node[dly] at (5.75,-1.5) {4.53 ns};
+  \draw[w] (rq.output) -- (m2);
+  \draw[w] (w2) -- (m2);
+  \draw[w] (rx.output) -- node[sig, above] {x} (m3);
+  \draw[w] (w1) -- (m3);
+  % registers at the second boundary
+  \node[sreg] (rm) at (7.1,0) {};
+  \node[sreg] (rw) at (7.1,-2.0) {};
+  \draw[w] (m2) -- (rm.input);
+  \node[sig, font=\scriptsize\ttfamily, above] at (6.35,0.42) {mul\_ln29};
+  \draw[w] (m3) -- node[sig, above] {x\_w1} (rw.input);
+  % state 3: the three-input adder
+  \node[blk, minimum height=1.6cm] (ad) at (8.9,-1.0) {$+$\\[-1pt]{\scriptsize 4.10 ns}};
+  \node[sig] (w0) at (8.9,-2.6) {w0};
+  \draw[w] (rm.output) -| ([xshift=-3mm]ad.north west) |- ([yshift=4mm]ad.west);
+  \draw[w] (rw.output) -| ([xshift=-3mm]ad.south west) |- ([yshift=-4mm]ad.west);
+  \draw[w] (w0) -- (ad.south);
+  \node[sig] (y) at (12.0,-1.0) {y};
+  \draw[w] (ad) -- node[sig, above] {ap\_return} (y);
+\end{tikzpicture}
+
 \end{document}

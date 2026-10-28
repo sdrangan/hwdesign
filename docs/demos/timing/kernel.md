@@ -30,7 +30,7 @@ where the registers go.
 
 ## The code
 
-`demos/timing/quad/src/quad.h`:
+`demos/timing/quad/quad.h`:
 
 ```cpp
 #include <ap_int.h>
@@ -41,7 +41,7 @@ typedef ap_int<26> out_t;
 out_t quad(in_t x, in_t w2, in_t w1, in_t w0);
 ```
 
-`demos/timing/quad/src/quad.cpp`:
+`demos/timing/quad/quad.cpp`:
 
 ```cpp
 out_t quad(in_t x, in_t w2, in_t w1, in_t w0) {
@@ -122,7 +122,7 @@ and the arithmetic.
 
 ## The testbench and the model
 
-`testbench/tb_quad.cpp` calls `quad()` on five test cases and writes the
+`tb_quad.cpp` calls `quad()` on five test cases and writes the
 results to `results.json`. The same testbench runs twice: against the C++
 function in C simulation, and against the synthesized RTL in
 co-simulation, where each call becomes one `ap_start` / `ap_done`

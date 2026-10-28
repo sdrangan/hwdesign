@@ -147,33 +147,11 @@ Three DSP blocks, one per multiply. And the register section names the
 line) are each held in a register between cycles. `ap_CS_fsm` is the
 small state machine that steps through the cycles.
 
-### The schedule: what happens in each cycle
+### The schedule
 
-The cycle-by-cycle schedule is in
-`quad_proj/p10/.autopilot/db/quad.verbose.sched.rpt`. Stripped of its
-bookkeeping, it reads:
-
-```text
-State 1 <Delay = 4.53>
-    xsq      = mul x, x                       4.53 ns   (DSP)
-State 2 <Delay = 4.58>
-    mul_ln29 = mul xsq, w2                    4.58 ns   (DSP)
-    x_w1     = mul w1, x                      4.53 ns   (DSP)
-State 3
-    y        = add mul_ln29, x_w1, w0         4.10 ns   (three-input adder)
-    ret y
-```
-
-This is the lecture's critical-path reasoning, done by the tool. Each
-operation takes about 4.5 ns, and the budget per cycle is 7.3 ns, so:
-
-- `x*x` and `w2*xsq` are in series, and 4.53 + 4.58 = 9.1 ns does not
-  fit in one cycle: they go in different cycles.
-- `w1*x` does not depend on `xsq`, so it shares a cycle with `w2*xsq`.
-- The adder needs both products, so it goes in a third cycle.
-
-Three states is two clock edges from start to done: a latency of 2. The
-estimated period, 4.586 ns, is the slowest state.
+Which operation Vitis put in which clock cycle, and why the answer is
+2 cycles, is in a second report, the schedule. It has a page of its own:
+[Analyzing the schedule](synth_sched.md).
 
 ### Reading the report from Python
 
@@ -252,4 +230,4 @@ can show a half-finished value: the 264 at the right mixes the next x,
 3, with the previous call's weights. A caller reads `ap_return` only when
 `ap_done` says it is ready.
 
-Next: [the same, at clocks from 50 to 400 MHz](sweep.md).
+Next: [analyzing the schedule](synth_sched.md), cycle by cycle.

@@ -41,10 +41,15 @@ There are no loops here; they arrive in the next unit.
    diagram of it, and the interface: plain wires and a start/done
    handshake, with no AXI.
 2. [Synthesis at one clock](synth.md): the build steps at 100 MHz, how to
-   read the synthesis report, the cycle-by-cycle schedule, reading the
-   report from Python with waveflow, and the RTL simulation's timing
-   diagram.
-3. [Sweeping the clock](sweep.md): the same at seven clocks from 50 to
+   read the synthesis report, reading it from Python with waveflow, and
+   the RTL simulation's timing diagram.
+3. [Analyzing the schedule](synth_sched.md): which operation Vitis put in
+   which clock cycle, where the report is, and the timing slack, for the
+   whole design and for each cycle.
+4. [In-class exercise: beat the schedule](synth_inclass.md): rewrite the
+   kernel so Vitis schedules it in fewer cycles, and build your version
+   with `--fast`.
+5. [Sweeping the clock](sweep.md): the same at seven clocks from 50 to
    400 MHz, the code that does it, the graphs, and what pipelining buys.
 
 ## The code
@@ -53,8 +58,8 @@ Everything is in `hwdesign/demos/timing/quad`:
 
 | File | What it is |
 | --- | --- |
-| `src/quad.cpp`, `src/quad.h` | the kernel and its interface pragmas |
-| `testbench/tb_quad.cpp` | the testbench, for C simulation and co-simulation |
+| `quad.cpp`, `quad.h` | the kernel and its interface pragmas |
+| `tb_quad.cpp` | the testbench, for C simulation and co-simulation |
 | `run.tcl` | the Vitis HLS script: `csim`, `sweep` or `cosim` per invocation |
 | `golden.py` | the test vector and an independent Python model |
 | `quad_timing.py` | reads the synthesis reports, and plots them and the waveforms |
