@@ -36,7 +36,7 @@ A tentative set of units is as follows.  The units are still in flux so new mate
 * Unit 7:  Pipelining and Loop Optimization
   * This unit will be split into two units -- one on pipelining and one on unrolling an memory accesses
   * Lecture:  [[PDF]](https://github.com/sdrangan/hwdesign/tree/main/units/unit07_loopopt/loopopt.pdf) [[pptx]](https://github.com/sdrangan/hwdesign/tree/main/units/unit07_loopopt/loopopt.pptx)
-  * [Vitis HLS Demo: A pipelined polynomial accelerator](../demos/loopopt)
+  * Vitis HLS Demo:  [Pipelining and unrolling a polynomial loop](../demos/loopopt/)
 * Unit 9:  Shared Memory architectures
   * Lecture:  [[PDF]](https://github.com/sdrangan/hwdesign/tree/main/units/unit09_sharedmem/sharedmem.pdf) [[pptx]](https://github.com/sdrangan/hwdesign/tree/main/units/unit09_sharedmem/sharedmem.pptx)
 * Unit 10:  Arrays and Matrix Multiplication
