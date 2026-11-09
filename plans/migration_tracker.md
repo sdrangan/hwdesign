@@ -79,9 +79,9 @@ for that unit; the demo/lab rows are the runnable material.
 | File | refs | category | status | integration notes |
 |---|---|---|---|---|
 | [units/unit06_timing/figs/timing_figs.ipynb](../units/unit06_timing/figs/timing_figs.ipynb) | x:4 | dead-xilinxutils | todo | (note: figs also modified in working tree) |
-| [demos/pipeline/view_timing.ipynb](../demos/pipeline/view_timing.ipynb) | x:9 | dead-xilinxutils | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
-| [demos/pipeline/poly_demo.py](../demos/pipeline/poly_demo.py) | x:4 | dead-xilinxutils | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there.  |
-| [demos/pipeline/pipeline_demo.ipynb](../demos/pipeline/pipeline_demo.ipynb) | p:11 | live-pysilicon | archived | Parked in hwdesign-soln/archive/ (2026-10-09), unmigrated; rework or delete it there. `demos/pipeline` is **mixed** (x+p) |
+| demos/pipeline/view_timing.ipynb | x:9 | dead-xilinxutils | deleted | Replaced by [poly_build.py](../demos/pipeline/poly/poly_build.py) (2026-11-09): a hand-written array kernel on `ap_memory` ports, with the pipelining and unrolling variants built from one source by macros; csim/cosim verified bit-exact against an FP32 golden model, schedules and timing diagrams plotted. Docs: `docs/demos/loopopt/`. |
+| demos/pipeline/poly_demo.py | x:4 | dead-xilinxutils | deleted | Replaced by [poly_build.py](../demos/pipeline/poly/poly_build.py) (2026-11-09): a hand-written array kernel on `ap_memory` ports, with the pipelining and unrolling variants built from one source by macros; csim/cosim verified bit-exact against an FP32 golden model, schedules and timing diagrams plotted. Docs: `docs/demos/loopopt/`. |
+| demos/pipeline/pipeline_demo.ipynb | p:11 | live-pysilicon | deleted | Replaced by [poly_build.py](../demos/pipeline/poly/poly_build.py) (2026-11-09): a hand-written array kernel on `ap_memory` ports, with the pipelining and unrolling variants built from one source by macros; csim/cosim verified bit-exact against an FP32 golden model, schedules and timing diagrams plotted. Docs: `docs/demos/loopopt/`. |
 | [units/unit06_timing/timing.pdf](../units/unit06_timing/timing.pdf) | x:2 | dead-xilinxutils | deferred | binary PDF — text mentions only; regenerate, don't edit |
 
 ### unit07_loopopt
