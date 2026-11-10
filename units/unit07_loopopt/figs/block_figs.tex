@@ -1,0 +1,251 @@
+% Block diagrams for the unit 7 slides, one tikzpicture per page.
+%
+% Built by make_figs.py, which compiles this file and renders each page to
+% <name>.png at 300 dpi.  The names are the "% fig:" comment above each
+% picture, in page order; make_figs.py checks that the count matches.
+%
+% By hand:
+%   pdflatex -shell-escape block_figs.tex
+%   pdftocairo -png -r 300 -singlefile -f N -l N block_figs.pdf <name>
+%
+% The styles are unit 6's (units/unit06_timing/figs/block_figs.tex): teal for
+% combinational logic, violet for registers and arrival times, amber for the
+% critical path.  loopopt_figs.tex is the older, article-style source these
+% replace.
+
+\documentclass[tikz,border=4pt]{standalone}
+
+\usepackage{amsmath}
+\usepackage[scaled=0.92]{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage{../../styles/course}
+
+\definecolor{violet}{HTML}{57068C}
+\definecolor{tint}{HTML}{EEE6F3}
+\definecolor{teal}{HTML}{00857C}
+\definecolor{tealtint}{HTML}{DCEFEC}
+\definecolor{amber}{HTML}{B4530F}
+\definecolor{ink}{HTML}{262626}
+\definecolor{muted}{HTML}{6E6E6E}
+
+\tikzset{
+  >=stealth,
+  every picture/.style={line width=0.7pt, ink},
+  blk/.style={draw=teal, fill=tealtint, text=ink, minimum height=0.9cm,
+              minimum width=1.1cm, align=center, font=\small},
+  reg/.style={shape=register, draw=violet, fill=tint, minimum width=0.7cm,
+              minimum height=1.0cm},
+  w/.style={->},
+  crit/.style={->, line width=2.2pt, amber, every node/.append style={text=ink}},
+  critl/.style={-, line width=2.2pt, amber, every node/.append style={text=ink}},
+  arr/.style={font=\small\bfseries, text=violet},
+  sig/.style={font=\small\ttfamily},
+  dly/.style={font=\scriptsize, text=muted},
+  dot/.style={circle, fill=ink, inner sep=0pt, minimum size=3.5pt},
+  stage/.style={dashed, muted, line width=0.8pt},
+  stagelbl/.style={font=\small\bfseries, text=muted},
+  regloc/.style={circle, draw=violet, line width=1.4pt, minimum size=7mm, inner sep=0pt},
+}
+
+\begin{document}
+
+% ----------------------------------------------------------------------
+% A series of three functions, in one cycle and as a three-stage pipeline.
+% ----------------------------------------------------------------------
+% fig: series_comb
+\begin{tikzpicture}
+  \node[sig] (x) at (-1.3,0) {x};
+  \node[reg] (r0) at (0,0) {};
+  \node[blk] (f1) at (2.0,0) {$f_1$};
+  \node[blk] (f2) at (4.2,0) {$f_2$};
+  \node[blk] (f3) at (6.4,0) {$f_3$};
+  \node[sig] (y) at (8.2,0) {y};
+  \draw[w] (x) -- (r0.input);
+  \draw[w] (r0.output) -- node[sig, above] {x\_s0} (f1);
+  \draw[w] (f1) -- node[sig, above] {z1} (f2);
+  \draw[w] (f2) -- node[sig, above] {z2} (f3);
+  \draw[w] (f3) -- (y);
+\end{tikzpicture}
+
+% fig: series_pipe
+\begin{tikzpicture}
+  \node[sig] (x) at (-1.3,0) {x};
+  \node[reg] (r0) at (0,0) {};
+  \node[blk] (f1) at (1.9,0) {$f_1$};
+  \node[reg] (r1) at (3.7,0) {};
+  \node[blk] (f2) at (5.6,0) {$f_2$};
+  \node[reg] (r2) at (7.4,0) {};
+  \node[blk] (f3) at (9.3,0) {$f_3$};
+  \node[sig] (y) at (11.0,0) {y};
+  \draw[w] (x) -- (r0.input);
+  \draw[w] (r0.output) -- node[sig, above] {x\_s0} (f1);
+  \draw[w] (f1) -- (r1.input);
+  \draw[w] (r1.output) -- node[sig, above] {z1\_s1} (f2);
+  \draw[w] (f2) -- (r2.input);
+  \draw[w] (r2.output) -- node[sig, above] {z2\_s2} (f3);
+  \draw[w] (f3) -- (y);
+  \node[stagelbl] at (0,1.0) {s0};
+  \node[stagelbl] at (3.7,1.0) {s1};
+  \node[stagelbl] at (7.4,1.0) {s2};
+\end{tikzpicture}
+
+% ----------------------------------------------------------------------
+% Multi-path pipelining: z1 = f1(x1), z2 = f2(x2), z3 = f3(z1, x1),
+% y = f4(z2, z3).  #1: 0 the circuit, 1 with stage lines, 2 with the
+% register locations circled.
+% ----------------------------------------------------------------------
+\newcommand{\multipath}[1]{%
+\begin{tikzpicture}
+  \node[sig] (x1) at (-1.3,0) {x1};
+  \node[reg] (r1) at (0,0) {};
+  \node[sig] (x2) at (-1.3,-1.8) {x2};
+  \node[reg] (r2) at (0,-1.8) {};
+  \node[blk] (f1) at (2.4,0) {$f_1$};
+  \node[blk] (f2) at (2.4,-1.8) {$f_2$};
+  \node[blk] (f3) at (5.9,0) {$f_3$};
+  \node[blk] (f4) at (9.2,-0.9) {$f_4$};
+  \node[sig] (y) at (10.9,-0.9) {y};
+  \draw[w] (x1) -- (r1.input);
+  \draw[w] (x2) -- (r2.input);
+  \draw[-] (r1.output) -- (1.2,0);
+  \node[dot] at (1.2,0) {};
+  \draw[w] (1.2,0) -- (f1);
+  \draw[w] (1.2,0) |- (5.9,1.15) -- (f3.north);
+  \draw[w] (r2.output) -- (f2);
+  \draw[w] (f1) -- node[sig, above, pos=0.2] {z1} (f3);
+  \draw[w] (f3.east) -- node[sig, above, pos=0.2] {z3} (7.9,0) |- ([yshift=5pt]f4.west);
+  \draw[w] (f2.east) -- node[sig, above, pos=0.08] {z2} (7.9,-1.8) |- ([yshift=-5pt]f4.west);
+  \draw[w] (f4) -- (y);
+  \ifnum#1>0
+    \foreach \xb/\lbl in {0/s0, 4.15/s1, 7.45/s2} {
+      \draw[stage] (\xb,1.75) -- (\xb,-2.6);
+      \node[stagelbl] at (\xb,2.0) {\lbl};
+    }
+    \node[stagelbl] at (2.1,-2.85) {Stage 1};
+    \node[stagelbl] at (5.8,-2.85) {Stage 2};
+    \node[stagelbl] at (9.4,-2.85) {Output};
+  \fi
+  \ifnum#1>1
+    \foreach \p in {(4.15,0), (4.15,1.15), (4.15,-1.8), (7.45,0), (7.45,-1.8)}
+      \node[regloc] at \p {};
+  \fi
+\end{tikzpicture}}
+
+% fig: mp_orig
+\multipath{0}
+% fig: mp_stages
+\multipath{1}
+% fig: mp_regs
+\multipath{2}
+
+% fig: mp_final
+\begin{tikzpicture}
+  \node[sig] (x1) at (-1.3,0) {x1};
+  \node[reg] (r1) at (0,0) {};
+  \node[sig] (x2) at (-1.3,-1.8) {x2};
+  \node[reg] (r2) at (0,-1.8) {};
+  \node[blk] (f1) at (2.4,0) {$f_1$};
+  \node[blk] (f2) at (2.4,-1.8) {$f_2$};
+  \node[reg] (rz1) at (4.15,0) {};
+  \node[reg] (rx1) at (4.15,1.15) {};
+  \node[reg] (rz2) at (4.15,-1.8) {};
+  \node[blk] (f3) at (5.9,0) {$f_3$};
+  \node[reg] (rz3) at (7.45,0) {};
+  \node[reg] (rz22) at (7.45,-1.8) {};
+  \node[blk] (f4) at (9.2,-0.9) {$f_4$};
+  \node[sig] (y) at (10.9,-0.9) {y};
+  \draw[w] (x1) -- (r1.input);
+  \draw[w] (x2) -- (r2.input);
+  \draw[-] (r1.output) -- (1.2,0);
+  \node[dot] at (1.2,0) {};
+  \draw[w] (1.2,0) -- (f1);
+  \draw[w] (1.2,0) |- (rx1.input);
+  \draw[w] (r2.output) -- (f2);
+  \draw[w] (f1) -- (rz1.input);
+  \draw[w] (f2) -- (rz2.input);
+  \draw[w] (rz1.output) -- (f3);
+  \draw[w] (rx1.output) -| (f3.north);
+  \draw[w] (f3) -- (rz3.input);
+  \draw[w] (rz2.output) -- (rz22.input);
+  \draw[w] (rz3.output) -- (7.9,0) |- ([yshift=5pt]f4.west);
+  \draw[w] (rz22.output) -- (7.9,-1.8) |- ([yshift=-5pt]f4.west);
+  \draw[w] (f4) -- (y);
+  \node[sig, above=1pt] at (r1.north) {x1\_s0};
+  \node[sig, below=1pt] at (r2.south) {x2\_s0};
+  \node[sig, above=1pt] at (rx1.north) {x1\_s1};
+  \node[sig, below=1pt, xshift=-4pt] at (rz1.south) {z1\_s1};
+  \node[sig, below=1pt] at (rz2.south) {z2\_s1};
+  \node[sig, above=1pt] at (rz3.north) {z3\_s2};
+  \node[sig, below=1pt] at (rz22.south) {z2\_s2};
+\end{tikzpicture}
+
+% ----------------------------------------------------------------------
+% The Two Cycle Design practice problem's solution (loopopt.xml in
+% hwdesign-soln): the single-cycle circuit and the two-stage pipeline, with
+% each signal's stable time.  Register outputs are stable at t = 0.
+% ----------------------------------------------------------------------
+\newcommand{\tcinputs}{%
+  \node[sig] (x2) at (-1.4,1.5) {x2};
+  \node[reg] (r2) at (0,1.5) {};
+  \node[sig, above=1pt] at (r2.north) {xreg2};
+  \draw[w] (x2) -- (r2.input);
+  \node[sig] (x1) at (-1.4,-1.5) {x1};
+  \node[reg] (r1) at (0,-1.5) {};
+  \node[sig, below=1pt] at (r1.south) {xreg1};
+  \draw[w] (x1) -- (r1.input);
+  \node[blk] (f1) at (3.4,2.2) {$f_1$\\[-2pt] \scriptsize 3.8 ns};
+  \node[blk] (f2) at (3.4,0) {$f_2$\\[-2pt] \scriptsize 2.1 ns};
+  \coordinate (a1) at ([yshift=-6pt]f1.west);
+  \coordinate (a2) at ([yshift=-6pt]f2.west);
+  \draw[-] (r2.output) -- node[arr, below] {0} (1.2,1.5);
+  \node[dot] at (1.2,1.5) {};
+  \draw[w] (1.2,1.5) |- ([yshift=6pt]f1.west);
+  \draw[w] (1.2,1.5) |- ([yshift=6pt]f2.west);
+  \draw[-] (r1.output) -- node[arr, below] {0} (1.9,-1.5);
+  \node[dot] at (1.9,-1.5) {};
+  \draw[-] (1.9,-1.5) -- (1.9,0 |- a1);
+  \draw[crit] (1.9,0 |- a1) -- (a1);
+  \node[dot] at (1.9,0 |- a2) {};
+  \draw[w] (1.9,0 |- a2) -- (a2);
+}
+
+% fig: q_tc_single
+\begin{tikzpicture}
+  \tcinputs
+  \node[blk] (f3) at (6.4,0) {$f_3$\\[-2pt] \scriptsize 1.5 ns};
+  \draw[w] (f2.east) -- node[sig, above] {z2} node[arr, below] {2.1} (f3.west);
+  \draw[w] (1.9,-1.5) -| (f3.south);
+  \node[blk] (f4) at (9.6,1.1) {$f_4$\\[-2pt] \scriptsize 1.2 ns};
+  \draw[crit] (f1.east) -- node[pos=0.3, sig, above] {z1} node[pos=0.3, arr, below] {3.8}
+    (8.4,2.2) |- ([yshift=6pt]f4.west);
+  \draw[w] (f3.east) -- node[sig, above] {z3} node[arr, below] {3.6}
+    (8.4,0) |- ([yshift=-6pt]f4.west);
+  \draw[crit] (f4.east) -- ++(1.4,0) node[sig, right] {y} node[midway, arr, below] {5.0};
+\end{tikzpicture}
+
+% fig: q_tc_pipe
+\begin{tikzpicture}
+  \tcinputs
+  \node[stagelbl] at (2.6,3.4) {Stage 1};
+  \node[stagelbl] at (8.6,3.4) {Stage 2};
+  \draw[stage] (5.4,3.6) -- (5.4,-2.6);
+  \node[reg] (rz1) at (5.4,2.2) {};
+  \node[sig, above=1pt, fill=white, inner sep=1pt] at (rz1.north) {z1\_s1};
+  \node[reg] (rz2) at (5.4,0) {};
+  \node[sig, above=1pt, fill=white, inner sep=1pt] at (rz2.north) {z2\_s1};
+  \node[reg] (rx1) at (5.4,-1.5) {};
+  \node[sig, below=1pt, fill=white, inner sep=1pt] at (rx1.south) {xreg1\_s1};
+  \draw[crit] (f1.east) -- node[sig, above] {z1} node[arr, below] {3.8} (rz1.input);
+  \draw[w] (f2.east) -- node[sig, above] {z2} node[arr, below] {2.1} (rz2.input);
+  \draw[w] (1.9,-1.5) -- (rx1.input);
+  \node[blk] (f3) at (8,-0.6) {$f_3$\\[-2pt] \scriptsize 1.5 ns};
+  \draw[w] (rz2.output) -- node[arr, below] {0} (6.9,0) |- ([yshift=6pt]f3.west);
+  \draw[w] (rx1.output) -- node[arr, below] {0} (6.9,-1.5) |- ([yshift=-6pt]f3.west);
+  \node[blk] (f4) at (11,1.1) {$f_4$\\[-2pt] \scriptsize 1.2 ns};
+  \draw[w] (rz1.output) -- node[pos=0.25, arr, below] {0} (9.8,2.2) |- ([yshift=6pt]f4.west);
+  \draw[w] (f3.east) -- node[sig, above] {z3} node[arr, below] {1.5}
+    (9.8,-0.6) |- ([yshift=-6pt]f4.west);
+  \draw[w] (f4.east) -- ++(1.4,0) node[sig, right] {y} node[midway, arr, below] {2.7};
+\end{tikzpicture}
+
+\end{document}
