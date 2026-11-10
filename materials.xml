@@ -40,6 +40,10 @@
   <!-- The walkthrough takes unit 7 from the loopopt deck's name; its
        unroll page is unit 8's. -->
   <item id="loopopt-demo" also="Unit 8:  Loop Unrolling and Memory"/>
+  <!-- The in-class exercise's code; its page is docs/demos/loopopt/inclass.md,
+       inside the walkthrough above. -->
+  <item id="loopopt_inclass" unit="Unit 7:  Pipelining"
+        title="In-class exercise: one read per iteration"/>
 
   <!-- Clocked SystemVerilog modules with their testbenches. -->
   <item id="simp_fun"><slides deck="fsm"/></item>
