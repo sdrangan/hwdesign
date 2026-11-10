@@ -57,10 +57,12 @@ Part 1, pipelining:
    simulations.
 3. [The pipeline schedule](schedule.md): which operation Vitis put in which
    cycle, and why a new iteration can start every cycle.
+4. [In-class exercise](inclass.md): a loop that asks for II = 1 and gets 2.
+   You rewrite it, in its own folder, `demos/loopopt_inclass`.
 
 Part 2, unrolling:
 
-4. [Unrolling the loop](unroll.md): unroll factors 2, 4 and 8, the memory
+5. [Unrolling the loop](unroll.md): unroll factors 2, 4 and 8, the memory
    bottleneck without partitioning, and throughput against resources.
 
 ## The code
