@@ -23,10 +23,11 @@ The `schedule_pipe` step draws it. To run it on its own:
 The [timing demo](../timing/synth_sched.md) introduced the schedule
 report for a function. A pipelined loop gets one of its own, because
 Vitis synthesizes it as a separate module, `poly_Pipeline_sample_loop`,
-which the top function `poly` starts and waits for:
+which the top function `poly` starts and waits for. From
+`hwdesign/demos/pipeline/poly`, it is:
 
 ```
-hwdesign/demos/pipeline/poly/proj_pipe/sol/.autopilot/db/poly_Pipeline_sample_loop.verbose.sched.rpt
+proj_pipe/sol/.autopilot/db/poly_Pipeline_sample_loop.verbose.sched.rpt
 ```
 
 The same cautions apply as before: `.autopilot` is hidden from most file
