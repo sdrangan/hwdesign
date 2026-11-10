@@ -248,4 +248,49 @@
   \draw[w] (f4.east) -- ++(1.4,0) node[sig, right] {y} node[midway, arr, below] {2.7};
 \end{tikzpicture}
 
+% ----------------------------------------------------------------------
+% The early-exit loop pipelined by hand (16-bit x): iteration i reads x[i]
+% into xr, squares the xr of the iteration before into zr, and tests and
+% writes the zr of the one before that.  The exit test reads only the j
+% register: a compare after a register, short whatever the multiply takes.
+% ----------------------------------------------------------------------
+% fig: exit_pipe
+\begin{tikzpicture}
+  % stages, first, so the registers and labels draw over the lines
+  \foreach \xb in {0, 3.8} \draw[stage] (\xb,1.9) -- (\xb,-4.4);
+  \node[stagelbl] at (-1.0,2.15) {read x[i]};
+  \node[stagelbl] at (1.9,2.15) {square x[i$-$1]};
+  \node[stagelbl] at (7.2,2.15) {test and write x[i$-$2]};
+  \node[sig] (x) at (-1.5,0) {x[i]};
+  \node[reg] (rx) at (0,0) {};
+  \node[sig, above=1pt, fill=white, inner sep=1pt] at (rx.north) {xr};
+  \node[blk] (sq) at (1.9,0) {square};
+  \node[reg] (rz) at (3.8,0) {};
+  \node[sig, above=1pt, fill=white, inner sep=1pt] at (rz.north) {zr};
+  \node[blk] (cmp) at (5.9,0) {$>$ zmin};
+  \node[blk, minimum width=1.5cm] (wr) at (9.0,0) {write\\[-2pt] z[j]};
+  \draw[w] (x) -- (rx.input);
+  \draw[w] (rx.output) -- (sq);
+  \draw[w] (sq) -- (rz.input);
+  \draw[-] (rz.output) -- (4.6,0);
+  \node[dot] at (4.6,0) {};
+  \draw[w] (4.6,0) -- (cmp);
+  \draw[w] (4.6,0) |- (9.0,1.1) -- node[sig, right, pos=0.5] {data} (wr.north);
+  \draw[w] (cmp) -- node[sig, above] {hit} (wr);
+  % the j counter: a register, enabled by hit, through +1
+  \node[reg] (rj) at (5.9,-2.3) {};
+  \node[sig, below=1pt] at (rj.south) {j};
+  \draw[w] (cmp.south) -- node[sig, right] {en} (rj.north);
+  \node[dot] (dj) at (7.2,-2.3) {};
+  \draw[-] (rj.output) -- (dj);
+  \draw[w] (dj) |- (8.5,-1.2) -| node[sig, right, pos=0.75] {addr} ([xshift=-12pt]wr.south);
+  \node[blk] (inc) at (5.9,-3.8) {$+1$};
+  \draw[w] (dj) |- (inc.east);
+  \draw[w] (inc.west) -- (4.7,-3.8) |- (rj.input);
+  % the exit: one compare after the j register
+  \node[blk] (ex) at (9.0,-2.3) {$\geq$ NZ};
+  \draw[crit] (dj) -- (ex);
+  \draw[crit] (ex.east) -- ++(1.3,0) node[sig, right] {break};
+\end{tikzpicture}
+
 \end{document}

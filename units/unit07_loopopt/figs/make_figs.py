@@ -245,7 +245,39 @@ def occ_sum(_):
                      title="sum: produced in S1, needed in the next S1.  II = 1 − 1 + 1 = 1")
 
 
+def occ_exit(_):
+    """The early-exit loop as written: the next iteration may start only once
+    this one's test says it did not break."""
+    return occupancy(["i = 0", "i = 1", "i = 2"], ["S0 read", "S1 square", "S2 test · write"],
+                     [0, 3, 6], ncycles=9, width=10.5,
+                     notes=[("arrow", 3.0, 0, 3.0, 1, AMBER), ("arrow", 6.0, 1, 6.0, 2, AMBER),
+                            ("span", 0, 3, -0.05, "II = 3", AMBER)],
+                     title="The exit: decided in S2, needed before the next S0.  "
+                           "II = 2 − 0 + 1 = 3")
+
+
+def occ_exit_pipe(_):
+    """Pipelined by hand: one loop iteration is one column -- it reads x[i],
+    squares x[i-1] and tests x[i-2] -- and j passes test to test."""
+    fig = occupancy(["x[0]", "x[1]", "x[2]", "x[3]"], ["read", "square", "test · write"],
+                    [0, 1, 2, 3], ncycles=6, width=9.0,
+                    notes=[("arrow", 3.0, 0, 3.0, 1, AMBER), ("arrow", 4.0, 1, 4.0, 2, AMBER),
+                           ("arrow", 5.0, 2, 5.0, 3, AMBER),
+                           ("span", 0, 1, -0.05, "II = 1", AMBER)],
+                    title="j: produced in the test, needed in the next test.  "
+                          "II = 2 − 2 + 1 = 1")
+    ax = fig.axes[0]
+    n = 4
+    ax.add_patch(FancyBboxPatch((2.02, -0.48), 0.86, n - 0.04,boxstyle="round,pad=0,rounding_size=0.08",
+                                fc="none", ec=SLATE, lw=2.0, ls=(0, (4, 2)), zorder=6))
+    ax.text(2.5, -0.7,"loop iteration i = 2: reads x[2], squares x[1], tests x[0]",
+            ha="center", va="top", color=SLATE, fontsize=11.5, fontweight="bold")
+    return fig
+
+
 FIGURES = {
+    "occ_exit": occ_exit,
+    "occ_exit_pipe": occ_exit_pipe,
     "util_single": util_single,
     "util_two": util_two,
     "occ_terms": occ_terms,
