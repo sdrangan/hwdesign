@@ -217,21 +217,32 @@ def occ_memory(_):
 
 def occ_merge(_):
     """Merge sort: stage 0 of the next iteration needs stage 1's i, j."""
-    return occupancy(["k = 0", "k = 1", "k = 2", "k = 3"], ["read", "compare", "write"],
-                     [0, 2, 4, 6], ncycles=9,
+    return occupancy(["k = 0", "k = 1", "k = 2", "k = 3"],
+                     ["S0 read", "S1 compare", "S2 write"], [0, 2, 4, 6], ncycles=9, width=10.5,
                      notes=[("arrow", 2.0, 0, 2.0, 1, AMBER), ("arrow", 4.0, 1, 4.0, 2, AMBER),
                             ("arrow", 6.0, 2, 6.0, 3, AMBER),
                             ("span", 0, 2, -0.05, "II = 2", AMBER)],
-                     title="The compare decides which index advances: the next read waits for it")
+                     title="i and j: produced in S1, needed in the next S0.  II = 1 − 0 + 1 = 2")
 
 
 def occ_float(_):
     """prod *= x[i] with a 4-cycle multiply: each multiply waits for the last."""
-    return occupancy(["i = 0", "i = 1", "i = 2"], ["load", "multiply (4 cycles)"], [0, 4, 8],
+    return occupancy(["i = 0", "i = 1", "i = 2"], ["S0", "S1 – S4 multiply"], [0, 4, 8],
                      span=[1, 4], ncycles=13,
                      notes=[("arrow", 5.0, 0, 5.0, 1, AMBER), ("arrow", 9.0, 1, 9.0, 2, AMBER),
                             ("span", 0, 4, -0.05, "II = 4", AMBER)],
-                     title="Iteration i's multiply needs the product iteration i − 1 produces")
+                     title="prod: produced at the end of S4, needed in the next S1.  "
+                           "II = 4 − 1 + 1 = 4")
+
+
+def occ_sum(_):
+    """int sum += x[i]: the add needs the last add's sum, one stage later -- no wait."""
+    return occupancy(["i = 0", "i = 1", "i = 2", "i = 3"], ["S0 load", "S1 add"],
+                     [0, 1, 2, 3], ncycles=6,
+                     notes=[("arrow", 2.0, 0, 2.0, 1, AMBER), ("arrow", 3.0, 1, 3.0, 2, AMBER),
+                            ("arrow", 4.0, 2, 4.0, 3, AMBER),
+                            ("span", 0, 1, -0.05, "II = 1", AMBER)],
+                     title="sum: produced in S1, needed in the next S1.  II = 1 − 1 + 1 = 1")
 
 
 FIGURES = {
@@ -241,6 +252,7 @@ FIGURES = {
     "occ_memory": occ_memory,
     "occ_merge": occ_merge,
     "occ_float": occ_float,
+    "occ_sum": occ_sum,
 }
 
 
