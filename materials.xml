@@ -32,6 +32,15 @@
        the stream demo's folder: the slides that cite poly link that one. -->
   <item id="fifoif" unit="Unit 5:  FIFOs and Streaming Interfaces"/>
 
+  <!-- The pipelining demo's code.  Its walkthrough is docs/demos/loopopt,
+       a folder of another name, so the two are separate items and the code
+       gets its units here: part 1 pipelines the loop, part 2 unrolls it. -->
+  <item id="pipeline" unit="Unit 7:  Pipelining"
+        also="Unit 8:  Loop Unrolling and Memory"/>
+  <!-- The walkthrough takes unit 7 from the loopopt deck's name; its
+       unroll page is unit 8's. -->
+  <item id="loopopt-demo" also="Unit 8:  Loop Unrolling and Memory"/>
+
   <!-- Clocked SystemVerilog modules with their testbenches. -->
   <item id="simp_fun"><slides deck="fsm"/></item>
 
