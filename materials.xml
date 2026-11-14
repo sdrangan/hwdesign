@@ -44,6 +44,15 @@
        inside the walkthrough above. -->
   <item id="loopopt_inclass" unit="Unit 7:  Pipelining"
         title="In-class exercise: one read per iteration"/>
+  <!-- Unit 8's code.  The reduction demo and the in-class exercise have their
+       pages inside the loopopt walkthrough (reduction.md, inclass_unroll.md);
+       the FIR demo's walkthrough is docs/demos/fir, a folder of the same
+       name, so it pairs by itself and needs only its unit. -->
+  <item id="fsum" unit="Unit 8:  Loop Unrolling and Memory"
+        title="Float sum unrolled four ways in Vitis HLS"/>
+  <item id="unroll_inclass" unit="Unit 8:  Loop Unrolling and Memory"
+        title="In-class exercise: unrolling a dot product"/>
+  <item id="fir" unit="Unit 8:  Loop Unrolling and Memory"/>
 
   <!-- Clocked SystemVerilog modules with their testbenches. -->
   <item id="simp_fun"><slides deck="fsm"/></item>
@@ -60,10 +69,12 @@
       offsets, with a C testbench and a notebook.</description>
   </item>
 
-  <item id="vector_mult" title="Vector multiply with loop unrolling">
+  <!-- No slide cites it since unit 8's deck was rebuilt around the poly,
+       fsum and fir demos, so it gets its unit here. -->
+  <item id="vector_mult" title="Vector multiply with loop unrolling"
+        unit="Unit 8:  Loop Unrolling and Memory">
     <description>Element-wise vector multiplication in Vitis HLS over m_axi
       ports, with a script that sweeps the unroll factor, and a PYNQ
       overlay.</description>
-    <slides deck="unroll" first="6" last="6"/>
   </item>
 </materials>
