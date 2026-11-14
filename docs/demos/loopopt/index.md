@@ -44,6 +44,8 @@ In going through this demo, you will:
   the unrolled loop the memory ports it needs
 - Measure the trade-off: **throughput** against **DSP blocks, LUTs and
   flip-flops**, as the unroll factor grows
+- See why unrolling a **sum** needs the loop body rewritten, and unroll a
+  dot product by hand
 
 ## The pages
 
@@ -60,10 +62,17 @@ Part 1, pipelining:
 4. [In-class exercise](inclass.md): a loop that asks for II = 1 and gets 2.
    You rewrite it, in its own folder, `demos/loopopt_inclass`.
 
-Part 2, unrolling:
+Part 2, unrolling (unit 8):
 
 5. [Unrolling the loop](unroll.md): unroll factors 2, 4 and 8, the memory
    bottleneck without partitioning, and throughput against resources.
+6. [Unrolling a sum](reduction.md): a float sum unrolled four ways, from
+   `demos/fsum`. The `UNROLL` pragma alone makes it no faster.
+7. [In-class exercise](inclass_unroll.md): unroll a dot product by hand,
+   partition its arrays, and measure each step, in its own folder,
+   `demos/unroll_inclass`.
+
+Nested loops are the [FIR demo](../fir/).
 
 ## The code
 
