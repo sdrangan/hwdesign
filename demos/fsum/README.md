@@ -27,4 +27,7 @@ walkthrough is the docs page *Demos › Loop Optimization › Unrolling a Sum*
 | `fsum_build.py` | the sequence |
 
 In `hwdesign-venv`, with Vitis HLS installed: `python fsum_build.py`, about
-3 minutes.  The table lands in `results/fsum.md`.
+3 minutes.  The table lands in `results/fsum.md`, and each variant's
+schedule, state by state, in `results/schedule.md`.  The walkthrough is four
+pages, starting at *Unrolling a Sum*; the files behind each number are
+listed there.

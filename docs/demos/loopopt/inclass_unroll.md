@@ -1,7 +1,7 @@
 ---
 title: "In-Class: Unrolling a Dot Product"
 parent: Loop Optimization
-nav_order: 7
+nav_order: 10
 has_children: false
 ---
 

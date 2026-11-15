@@ -3,13 +3,15 @@
 The kernel (``fsum.cpp``), the testbench (``tb_fsum.cpp``) and the Vitis
 script (``run.tcl``) are hand-written.  This file adds the sequence:
 
-    make_inputs -> csim -> verify_csim_<variant> (x4) -> synth -> report
+    make_inputs -> csim -> verify_csim_<variant> (x4) -> synth -> report, schedule
 
 ``csim`` checks all four variants against the Python model (golden.py): they
 add in different orders, and the test values are chosen so every order gives
 the same, exact, sum.  ``synth`` builds each variant in its own Vitis project,
 ``proj_<variant>``, and ``report`` puts them side by side in
-``results/fsum.md``.
+``results/fsum.md``.  ``schedule`` reads each variant's schedule report and
+writes ``results/schedule.md``: which state each add, read and running sum
+is in, and the II the running sum allows.
 
     python fsum_build.py          # about 3 minutes
 
@@ -107,6 +109,133 @@ def write_table(rows: list[dict], path: Path) -> Path:
     return path
 
 
+# ----------------------------------------------------------------- schedule --
+# Vitis writes the schedule of every module it synthesizes to
+#   proj_<variant>/sol/.autopilot/db/<module>.verbose.sched.rpt
+# -- an internal file (hidden folder, format may change between versions; this
+# parser reads Vitis HLS 2025.1's).  The loop is scheduled inside `fsum` itself,
+# except in lanes, where Vitis makes it a module of its own,
+# fsum_Pipeline_sum_loop, and `fsum` keeps the epilogue after it.
+_OP_LINE = re.compile(
+    r'^ST_(?P<state>\d+) : Operation \d+ \[(?P<k>\d+)/(?P<n>\d+)\].*?'
+    r'"%(?P<name>[\w.]+) = (?P<op>\w+) (?P<args>[^"]*)"(?: \[(?P<src>[^\]]+)\])?')
+_PIPE = re.compile(r"Pipeline-0 : II = (?P<ii>\d+), D = (?P<d>\d+)")
+
+
+def sched_reports(root: Path, name: str) -> list[Path]:
+    """The variant's schedule reports: the loop's module first, then fsum."""
+    db = root / f"proj_{name}" / SOLUTION / ".autopilot" / "db"
+    found = [p for p in (db / f"{TOP}_Pipeline_sum_loop.verbose.sched.rpt",
+                         db / f"{TOP}.verbose.sched.rpt") if p.is_file()]
+    if not found:
+        raise RuntimeError(f"No schedule report in {db}: synthesize {name} first.")
+    return found
+
+
+def read_schedule(path: Path) -> dict:
+    """The float adds, the reads of x and the loads and stores of the running
+    sums, each with the states it spans.
+
+    An operation of n states appears in each, marked [n/n] down to [1/n].
+    Dropped: the loop counter (an i10 or i11), the zeroing of the sums before
+    the loop, bit casts and the rest of the bookkeeping, which take no time."""
+    text = path.read_text(encoding="utf-8", errors="replace")
+    pipe = _PIPE.search(text)
+    ops: list[dict] = []
+    open_ops: dict[str, dict] = {}
+    for line in text.splitlines():
+        hit = _OP_LINE.match(line)
+        if hit is None:
+            continue
+        op, name, args = hit["op"], hit["name"], hit["args"]
+        if op == "fadd":
+            pass
+        elif op == "load" and ("%x_addr" in args or args.startswith("i32 ")):
+            pass
+        elif op == "store" and args.startswith("i32 ") and not args.startswith("i32 0,"):
+            pass
+        else:
+            continue
+        state, k, n = int(hit["state"]), int(hit["k"]), int(hit["n"])
+        entry = open_ops.get(name)
+        if k == n or entry is None:
+            entry = {"name": name, "op": op, "args": args.replace("%", ""),
+                     "first": state, "last": state,
+                     "src": (hit["src"] or "").split("->")[0]}
+            ops.append(entry)
+            open_ops[name] = entry
+        entry["last"] = max(entry["last"], state)
+    ops.sort(key=lambda o: (o["first"], o["name"]))
+    return {"report": path, "ii": int(pipe["ii"]) if pipe else None,
+            "depth": int(pipe["d"]) if pipe else None, "ops": ops}
+
+
+def recurrences(sched: dict) -> list[dict]:
+    """Each running sum the loop loads and later stores: the loop-carried
+    dependencies.  The next iteration may load in the state this one
+    stores, so they allow II >= store state - load state."""
+    loads = {o["args"].split()[-1]: o["first"] for o in sched["ops"] if o["op"] == "load"
+             and not o["args"].endswith(("x_addr",)) and "x_addr" not in o["args"]}
+    out = []
+    for o in sched["ops"]:
+        if o["op"] == "store":
+            var = o["args"].split()[-1]
+            if var in loads:
+                out.append({"var": var, "load": loads[var], "store": o["first"],
+                            "ii_min": o["first"] - loads[var]})
+    return out
+
+
+def adders_built(root: Path, name: str) -> int:
+    """fadd instances in every module's synthesis report, counted once each."""
+    rdir = root / f"proj_{name}" / SOLUTION / "syn" / "report"
+    names = set()
+    for rpt in rdir.glob("*_csynth.rpt"):
+        names.update(re.findall(r"^\s*\|(fadd_\w+_U\d+)\s*\|", rpt.read_text(
+            encoding="utf-8", errors="replace"), re.M))
+    return len(names)
+
+
+def describe_schedule(root: Path, name: str) -> list[str]:
+    lines = [f"## {name}: `{VARIANTS[name][1]}`", ""]
+    for path in sched_reports(root, name):
+        sched = read_schedule(path)
+        rel = path.relative_to(root).as_posix()
+        if sched["ii"]:
+            lines += [f"`{rel}`: the loop, II = {sched['ii']}, depth = {sched['depth']} "
+                      "states", ""]
+        else:
+            lines += [f"`{rel}`: after the loop, not pipelined", ""]
+        lines += ["| Operation | Kind | States | Slot | Operands | Source |", "|---|---|---|---|---|---|"]
+        for o in sched["ops"]:
+            span = str(o["first"]) if o["first"] == o["last"] else f"{o['first']}-{o['last']}"
+            slot = (str(o["first"] % sched["ii"]) if sched["ii"] and o["op"] == "fadd" else "")
+            lines.append(f"| {o['name']} | {o['op']} | {span} | {slot} | {o['args']} | "
+                         f"{o['src']} |")
+        lines.append("")
+        adds = [o for o in sched["ops"] if o["op"] == "fadd"]
+        if sched["ii"]:
+            slots = sorted({o["first"] % sched["ii"] for o in adds})
+            lines.append(f"{len(adds)} add{'s' if len(adds) > 1 else ''} start"
+                         f"{'' if len(adds) > 1 else 's'} in state{'s' if len(adds) > 1 else ''} "
+                         f"{', '.join(str(o['first']) for o in adds)}: slots "
+                         f"{', '.join(str(o['first'] % sched['ii']) for o in adds)} mod "
+                         f"{sched['ii']}, {len(slots)} different.")
+            for r in recurrences(sched):
+                lines.append(f"Loop-carried: `{r['var']}` loaded in state {r['load']}, stored "
+                             f"in state {r['store']}: II >= {r['store']} - {r['load']} = "
+                             f"{r['ii_min']}.")
+        elif adds:
+            together = [s for s in {o["first"] for o in adds}
+                        if sum(o["first"] == s for o in adds) > 1]
+            if together:
+                lines.append(f"Adds starting together in state {together[0]}: one adder each.")
+        lines.append("")
+    lines += [f"Adders built (fadd instances in the synthesis reports): "
+              f"{adders_built(root, name)}", ""]
+    return lines
+
+
 # --------------------------------------------------------------------- steps --
 @dataclass(kw_only=True)
 class MakeInputsStep(BuildStep):
@@ -169,6 +298,26 @@ class ReportStep(BuildStep):
         return {"fsum_json": out}
 
 
+@dataclass(kw_only=True)
+class ScheduleStep(BuildStep):
+    description = ("Write results/schedule.md: each variant's adds, reads and sums, state by "
+                   "state, from Vitis's schedule reports.")
+    consumes = ["synth_done"]
+    produces = {"schedule_md": Path("results/schedule.md")}
+    params: ClassVar[dict] = {}
+
+    def run(self, config: BuildConfig, **_) -> dict:
+        lines = ["# The four variants, state by state", "",
+                 "From `proj_<variant>/sol/.autopilot/db/*.verbose.sched.rpt`.  A state is a "
+                 "clock cycle of one iteration; Slot is an add's first state mod II.", ""]
+        for v in VARIANTS:
+            lines += describe_schedule(config.root_dir, v)
+        out = config.root_dir / "results" / "schedule.md"
+        out.write_text("\n".join(lines), encoding="utf-8")
+        print(f"wrote {out}")
+        return {"schedule_md": out}
+
+
 # ----------------------------------------------------------------------- dag --
 _RESULTS = [{"filename": "results.json", "compare_fields": ["n", "sum_bits"]}]
 
@@ -188,6 +337,7 @@ def build_dag() -> BuildDag:
                                      report_artifact=f"verify_{v}"))
     dag.add(SynthStep(name="synth"))
     dag.add(ReportStep(name="report"))
+    dag.add(ScheduleStep(name="schedule"))
     return dag
 
 
@@ -195,7 +345,7 @@ def main() -> None:
     run_dag_cli(
         build_dag,
         description="The float-sum demo: a reduction unrolled four ways.",
-        default_through="report",
+        default_through="schedule",
         root_dir=_SOURCE_DIR,
         extra_args=[(("--live-output",), {"action": "store_true",
                                           "help": "Stream Vitis output instead of capturing it."})],
