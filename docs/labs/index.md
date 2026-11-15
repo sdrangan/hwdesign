@@ -25,6 +25,10 @@ semester.
 * [Unit 5:  Command-response mini-project](./cmdresp/)
    * Specify a streaming accelerator in the command-response pattern, and have
    an AI agent build it through C simulation, co-simulation and synthesis.
+* [Unit 8:  Stereo depth](./stereo/)
+   * Compute a disparity map by block matching in Vitis HLS, and take it from
+   17 million cycles a frame to one pixel per cycle with pipelining, unrolling
+   and array partitioning.
 
 
 
