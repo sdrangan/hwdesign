@@ -44,7 +44,7 @@ everyone.
 
 ## Labs
 
-The material will be taught through a series of [practical labs](../units/).
+The material will be taught through a series of [practical labs](../labs/), one or more with each of the [course units](./units.md).
 Students will design and simulate hardware in [Vitis HLS and Vivado](../support/amd/), a powerful industry-standard computer-aided design tools from AMD.
 Most of the material can be done in simulation.  Students will also be able
 deploy and test the designs on actual [FPGA boards](../support/hw_setup/).
@@ -58,7 +58,7 @@ The tentative grading is:
 * Final (25%)
 * Design project (25%)
 
-In the [design project](./project.md), students will work in groups and build a complete
+In the [design project](../projects/), students will work in groups and build a complete
 hardware IP for any task of their choices.
 
 ## Course Schedule

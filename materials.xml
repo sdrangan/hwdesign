@@ -24,6 +24,7 @@
   <item id="rootsolve" unit="Unit 4:  Memory and Processor Interfaces"/>
   <item id="cmdresp" unit="Command-Response Mini-Project"
         also="Unit 5:  FIFOs and Streaming Interfaces"/>
+  <item id="stereo" unit="Unit 8:  Loop Unrolling and Memory"/>
 
   <!-- Combinational SystemVerilog: integer widths, overflow, bit packing. -->
   <item id="datatypes"><slides deck="basic-logic"/></item>
