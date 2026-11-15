@@ -67,8 +67,14 @@ Part 2, unrolling (unit 8):
 5. [Unrolling the loop](unroll.md): unroll factors 2, 4 and 8, the memory
    bottleneck without partitioning, and throughput against resources.
 6. [Unrolling a sum](reduction.md): a float sum unrolled four ways, from
-   `demos/fsum`. The `UNROLL` pragma alone makes it no faster.
-7. [In-class exercise](inclass_unroll.md): unroll a dot product by hand,
+   `demos/fsum`: running it, and which report holds each number.
+7. [Reading the II from the stages](reduction_stages.md): the rolled loop
+   stage by stage, and why the `UNROLL` pragma alone makes it no faster.
+8. [Rewriting the body](reduction_rewrite.md): a tree, and four lanes, each
+   four times faster, in the lecture's model and in Vitis's schedule.
+9. [How many adders?](reduction_adders.md): adds per iteration ÷ II, the
+   adder cycle by cycle, and where lanes' extra hardware comes from.
+10. [In-class exercise](inclass_unroll.md): unroll a dot product by hand,
    partition its arrays, and measure each step, in its own folder,
    `demos/unroll_inclass`.
 
