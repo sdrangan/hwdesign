@@ -68,19 +68,30 @@ Notes:
 - Give one concrete calculation for bus vs. crossbar: N masters on a bus share
   one channel's bandwidth; on a crossbar they run in parallel unless two target
   the same slave.
-- Reduce the AXI material to what the timing diagrams in section 2 need:
-  address, burst length, latency to first word, then one word per cycle. Most
-  of the topology and AXI signal slides can shrink to one or two.
+- Built (2026-11-17): the bus-vs-crossbar rule is taught on one flow
+  (B = 4, 2, 3 cycles, frames A, B, C) over four slides -- bus, crossbar (the
+  transfers pipeline: period max B, latency sum B), a half-duplex DDR, and a
+  block that appears twice -- with timelines computed by a scheduler in
+  `tools/build_sharedmem_slides.py`. Master/slave is recapped, not
+  re-assessed (unit 4 covered it).
+- Pending: a crossbar-vs-bus area and latency demo on the Zynq-7020, from
+  Waveflow's `xbar_profile` (SAMD vs SASD), placed after the crossbar timeline.
 
-### 2. AXI master transactions
+### 2. Transactional interfaces
 
 Skills:
 
 - Design a transactional master interface with a streaming interface to the
   kernel.
-- Draw simple timing diagrams to estimate when transactions and a job complete.
 
 Notes:
+
+- The first concurrent tasks in the course: the kernel and its two adaptors
+  run at once. Three slides introduce them: concurrent tasks, `hls::task` in
+  Vitis (a copy kernel's top), and the rules for streams between tasks (streams
+  only, plus a `stable`, `offset=off` `m_axi` pointer; no shared variables; one
+  owner per `m_axi` port), why streams make concurrency safe, and deadlock as
+  the cost.
 
 - Open with *why* a transactional interface, before how: the kernel never sees
   addresses, every request returns a tagged completion, and an arbiter can merge
@@ -92,13 +103,28 @@ Notes:
   completion endpoint is **`m_done`** (renamed from `s_done` in Waveflow
   PR #312; `s_done` remains as a deprecated alias).
 - Addresses are word offsets from a bound base, not bytes.
+- The generated C++ still names the completion stream `s_done` (the rename was
+  Python-only so far); slides name streams by role (`rd_cmd`, `rd_data`,
+  `rd_done`).
+
+### 3. AXI4 bursts and timing
+
+Skills:
+
+- Draw simple timing diagrams to estimate when transactions and a job complete.
+
+Notes:
+
+- Kept from the old deck: AXI family, AXI4-MM features, the AXI4-Lite review,
+  burst signals, the write example. Its figure disagrees with its bullets and
+  with AXI (`AWLEN` is beats - 1): fix the figure.
 - Timing model, from Waveflow's `MemoryMod`: a burst of n words costs about
   `latency_init + n * latency_per_word` cycles, plus bus request and return
   latency. Students estimate a job's completion as
   command → read burst → compute → write burst → response.
   Unit 10 then asks what happens when those overlap.
 
-### 3. MM queues and credit
+### 4. MM queues and credit
 
 Frame as **how others reach your kernel**: the slave views (register bank,
 queue in, queue out, BRAM window).
@@ -115,7 +141,7 @@ Notes:
   and the consumer returns a cumulative count of words consumed
   (`credit::Producer` / `credit::Consumer` in HLS).
 
-### 4. Design example: histogram
+### 5. Design example: histogram
 
 Built fresh in the new style:
 
@@ -139,8 +165,8 @@ of focus; the interfaces are the point.
 
 ### Pacing
 
-Four sections plus a design example is a lot for one lecture. If time is short,
-compress section 1; sections 2 and 3 are the new material.
+Five sections is more than one lecture. If time is short, compress section 1
+and the AXI signal slides of section 3; sections 2 and 4 are the new material.
 
 ## Unit 10: Task-level pipelining and LCS
 
