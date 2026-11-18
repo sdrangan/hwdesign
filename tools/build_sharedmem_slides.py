@@ -441,6 +441,76 @@ def s_xb_solution(ids):
             sldnum_ph(ids)]
 
 
+# ---- the crossbar demo: AMD's axi_crossbar on the Zynq-7020 ---------------
+# Measured by demos/xbar (branch demo/xbar): 100 MHz, 64-bit data, routed out
+# of context; latency under XSI, first address handshake to last response.
+# Figures copied from docs/demos/xbar/images.
+
+def s_xbar_demo(ids):
+    return kit._demo(ids, "The Demo: Crossbar or Shared Bus", "Demos › Crossbar or Shared Bus",
+                     ["cd demos/xbar",
+                      "python xbar_demo.py",
+                      "python xbar_demo.py --fresh",
+                      "python xbar_demo.py --through synth"],
+                     ["The area table: every shape from 1x2 to 4x4, crossbar beside bus",
+                      "2x2 and 4x4 simulated live in both modes",
+                      "`--fresh` recompiles the simulations: about a minute",
+                      "`--through synth` places and routes one 4x4: 3–4 minutes"],
+                     ("AMD's axi_crossbar on the Pynq-Z2's Zynq-7020 at 100 MHz, 64-bit data.  "
+                      "SAMD mode is a crossbar, SASD a shared bus.",
+                      "The IP Vivado puts in a block design: real area, real cycles."))
+
+
+def s_xbar_area(ids):
+    rows = [["Shape", "Crossbar LUT / FF", "Bus LUT / FF"],
+            ["1x2", "342 / 507", "265 / 230"],
+            ["2x2", "618 / 545", "374 / 237"],
+            ["4x4", "1,397 / 978", "649 / 251"]]
+    return [title_ph(ids, "Crossbar or Bus: Area"),
+            lo.pic(ids, "xbar_area_luts", L, 1.7, 6.9, 3.9, align="l"),
+            table(ids, 7.85, 1.75, [1.0, 1.85, 1.85], ctr(rows), rowh=0.42, sz=14),
+            textbox(ids, 7.85, 3.6, 4.7, 2.3, [
+                kit.bullet("The bus is nearly **flat**: one transaction's registers, whatever "
+                           "the shape (FFs 230 → 251)", sz=14, spcBef=0),
+                kit.bullet("The crossbar grows **much faster**, and the gap widens with size", sz=14),
+                kit.bullet("Still small here: the 4x4 crossbar is under 3% of the chip's 53,200 "
+                           "LUTs.  All meet 100 MHz", sz=14)]),
+            label(ids, L, 5.75, W, 0.4, "Zynq-7020, 100 MHz, 64-bit data, routed out of context.  "
+                  "No BRAM, no DSP.", sz=12),
+            sldnum_ph(ids)]
+
+
+def s_xbar_cycles(ids):
+    return [title_ph(ids, "Crossbar or Bus: Throughput"),
+            lo.pic(ids, "xbar_cycles", L, 1.65, 7.3, 3.7, align="l"),
+            textbox(ids, 8.25, 1.75, 4.3, 3.6, [
+                para("2, 3 or 4 masters each write 16 beats at once", sz=14, color=MUTED,
+                     spcAft=6),
+                kit.bullet("**One write alone**: 20–21 cycles on either", sz=15, spcBef=0),
+                kit.bullet("**Each to its own slave**: 4 masters finish in !!30!! on the "
+                           "crossbar, ^^80^^ on the bus", sz=15),
+                kit.bullet("**All to one slave**: 75 against 80.  A slave takes one burst at a "
+                           "time, so the crossbar barely helps", sz=15)]),
+            band(ids, "As on the flow slides: a crossbar helps only when the traffic is **spread "
+                      "over the slaves**.  Many masters on one DDR port gain almost nothing.",
+                 y=5.5, h=0.7, sz=15),
+            sldnum_ph(ids)]
+
+
+def s_xbar_timeline(ids):
+    return [title_ph(ids, "Parallelism, Not Latency"),
+            lo.pic(ids, "xbar_timeline_4x4", L, 1.65, 8.0, 3.8, align="l"),
+            textbox(ids, 8.95, 1.75, 3.6, 3.7, [
+                kit.bullet("4x4: four 16-beat writes issued at cycle 0", sz=14, spcBef=0),
+                kit.bullet("Crossbar, own slaves: done at 21, 24, 27, 30.  One **address "
+                           "arbiter** still starts them 3 cycles apart: shared address, "
+                           "multiple data", sz=14),
+                kit.bullet("Every other case: one burst after another, 20 cycles each", sz=14)]),
+            band(ids, "A crossbar buys **parallelism**, not latency: one write takes about 20 "
+                      "cycles either way.", y=5.6, h=0.6, sz=16),
+            sldnum_ph(ids)]
+
+
 # ========================================================== section 2 ======
 # AXI master transactions, through Waveflow's read and write adaptors
 # (MemRStream / MemWStream).  C++ names are the generated headers' (MRCmd,
@@ -585,6 +655,78 @@ def s_hls_task(ids):
             sldnum_ph(ids)]
 
 
+# One colour per role, the same in the code and in the drawing.
+EXT_C, TASK_C, STREAM_C = SLATE, VIOLET, TEAL
+ROLE = {**{t: EXT_C for t in ("s_cmd", "s_done", "m_in", "m_out")},
+        **{t: TASK_C for t in ("ctrl_task", "read_task", "write_task", "t0", "t1", "t2")},
+        **{t: STREAM_C for t in ("rd_cmd", "wr_cmd", "data")}}
+_TOKEN = re.compile(r"\b(" + "|".join(sorted(ROLE, key=len, reverse=True)) + r")\b")
+
+
+def colour_code(ids, x, y, w, src, sz=10.5, inset=0.16):
+    """A code box whose role tokens are bold and coloured; the rest as kit.code_box."""
+    lines = src.strip("\n").split("\n")
+    paras = []
+    for ln in lines:
+        runs, pos = [], 0
+        for m in _TOKEN.finditer(ln):
+            if m.start() > pos:
+                runs.append(kit.run(ln[pos:m.start()], sz=sz, color=TEXT, font="code"))
+            runs.append(kit.run(m.group(0), sz=sz, color=ROLE[m.group(0)], b=True, font="code"))
+            pos = m.end()
+        if pos < len(ln):
+            runs.append(kit.run(ln[pos:], sz=sz, color=TEXT, font="code"))
+        paras.append(f"<a:p>{''.join(runs)}{kit.rpr(sz=sz, tag='a:endParaRPr')}</a:p>")
+    h = 2 * inset + len(lines) * sz * 1.22 / 72
+    return shape(ids, x, y, w, h, fill=kit.CODEFILL, line=kit.GRAYLINE, lw=0.75, anchor="t",
+                 inset=inset, paras=paras)
+
+
+def _role_box(ids, x, y, w, h, text, role, sz=13):
+    fill = {EXT_C: SLATETINT, TASK_C: TINT, STREAM_C: TEALTINT}[role]
+    return shape(ids, x, y, w, h, fill=fill, line=role, lw=1.5, prst="roundRect", adj=18000,
+                 paras=[para(text, sz=sz, color=role, b=True, align="ctr")])
+
+
+def s_top_mapped(ids):
+    # task boxes: (x, y, w, h)
+    ctrl, rd, wr, th = (8.65, 2.75, 2.3), (7.95, 3.95, 1.75), (10.75, 3.95, 1.75), 0.6
+    out = [title_ph(ids, "Reading the Top: Code and Hardware"),
+           colour_code(ids, L, 1.75, 6.95, TOP_SRC, sz=10.5),
+           # external interfaces
+           _role_box(ids, 9.15, 1.8, 1.3, 0.45, "s_cmd", EXT_C),
+           _role_box(ids, 8.2, 5.15, 1.25, 0.45, "m_in", EXT_C),
+           _role_box(ids, 10.5, 5.15, 1.05, 0.45, "m_out", EXT_C),
+           _role_box(ids, 11.65, 5.15, 0.9, 0.45, "s_done", EXT_C, sz=12),
+           # tasks
+           _role_box(ids, ctrl[0], ctrl[1], ctrl[2], th, "t0: ctrl_task", TASK_C),
+           _role_box(ids, rd[0], rd[1], rd[2], th, "t1: read_task", TASK_C),
+           _role_box(ids, wr[0], wr[1], wr[2], th, "t2: write_task", TASK_C),
+           # wires to the outside
+           arrow(ids, 9.8, 2.25, 9.8, ctrl[1], EXT_C, lw=1.75),
+           arrow(ids, 8.825, 5.15, 8.825, rd[1] + th, EXT_C, lw=1.75),
+           arrow(ids, 11.025, wr[1] + th, 11.025, 5.15, EXT_C, lw=1.75),
+           arrow(ids, 12.1, wr[1] + th, 12.1, 5.15, EXT_C, lw=1.75),
+           # streams between tasks
+           arrow(ids, 9.2, ctrl[1] + th, 8.825, rd[1], STREAM_C, lw=2.25),
+           arrow(ids, 10.4, ctrl[1] + th, 11.625, wr[1], STREAM_C, lw=2.25),
+           arrow(ids, rd[0] + rd[2], rd[1] + th / 2, wr[0], wr[1] + th / 2, STREAM_C, lw=2.25),
+           label(ids, 7.4, 3.3, 1.4, 0.3, "rd_cmd", sz=12, color=STREAM_C, b=True,
+                 align="r"),
+           label(ids, 11.15, 3.4, 1.4, 0.3, "wr_cmd", sz=12, color=STREAM_C, b=True),
+           label(ids, rd[0] + rd[2], rd[1] - 0.02, wr[0] - rd[0] - rd[2], 0.3, "data", sz=12,
+                 color=STREAM_C, b=True, align="ctr")]
+    # legend, under the code
+    lx = L
+    for name, role in (("external interface", EXT_C), ("task", TASK_C),
+                       ("stream between tasks", STREAM_C)):
+        out.append(_role_box(ids, lx, 5.55, 0.32, 0.26, "", role))
+        out.append(label(ids, lx + 0.4, 5.52, 2.3, 0.3, name, sz=13, color=role, b=True))
+        lx += 2.45
+    out.append(sldnum_ph(ids))
+    return out
+
+
 def s_task_streams(ids):
     return [title_ph(ids, "Streams Between Tasks"),
             kit.heading(ids, L, 1.75, 6.0, "THE RULES WE FOLLOW"),
@@ -609,6 +751,9 @@ def s_task_streams(ids):
                   "Waveflow found other forms of `m_axi` pointer deadlock at RTL after a few jobs, "
                   "while C simulation passed.  Its notes: "
                   "docs/guide/comp_codegen/freerunning_composite.md", sz=12),
+            label(ids, L, 6.05, W, 0.35,
+                  "**Unit 10** covers concurrent tasks in much more depth: pipelining them, "
+                  "sizing their streams, and avoiding deadlock.", sz=14, color=TEXT),
             sldnum_ph(ids)]
 
 
@@ -877,11 +1022,13 @@ PLAN = [
     ("new", s_flow_bus), ("new", s_flow_xbar), ("new", s_flow_half), ("new", s_flow_twice),
     ("new", s_xb_practice), ("new", s_xb_solution),
     ("old", 15, None),
+    ("new", s_xbar_demo), ("new", s_xbar_area), ("new", s_xbar_cycles),
+    ("new", s_xbar_timeline),
     # section 2: transactional interfaces
     ("new", s_outline(1)),
     ("old", 19, None), ("old", 20, None), ("old", 21, None), ("old", 22, None),
     ("new", s_why_transactional), ("new", s_concurrent), ("new", s_hls_task),
-    ("new", s_task_streams), ("new", s_read_adaptor), ("new", s_kernel_use),
+    ("new", s_top_mapped), ("new", s_task_streams), ("new", s_read_adaptor), ("new", s_kernel_use),
     ("new", s_tags), ("new", s_cmd_practice), ("new", s_cmd_solution),
     # section 3: AXI4 bursts and timing
     ("new", s_outline(2)),
