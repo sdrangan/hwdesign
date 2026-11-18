@@ -19,10 +19,10 @@ The mm version synthesizes the same kernel (``histogram_stream``) and has no C s
 own; its XSI top is the hand-assembled ``histogram_mm.v`` plus Waveflow's adaptor RTL, driven by
 a host model (``tb_xsi_histogram_mm.cpp``) on its AXI slave port.
 
-``gen_include`` writes ``include/``: this kernel's HistCmd / HistResp headers from
-``hist_schema.py``, and Waveflow's adaptor headers (``mem_r_stream_task.h``,
-``mem_w_stream_done_task.h``, ``MRCmd`` / ``MWCmd`` / ``MemComplete``) verbatim, the way its
-own generator copies them.  ``csim`` runs Vitis C simulation; ``synth`` runs C synthesis;
+``gen_include`` writes ``include/``: this kernel's HistCmd / HistDesc / HistResp headers from
+``hist_schema.py``, the framed movers' ``MemRCmd`` / ``MemWCmd`` headers, and Waveflow's
+adaptor bodies (``mem_r_stream_framed_task.h``, ``mem_w_stream_framed_done_task.h``, ...)
+verbatim, the way its own generator copies them.  ``csim`` runs Vitis C simulation; ``synth`` runs C synthesis;
 ``xsi`` drives the synthesized RTL with Waveflow's AXI bus models and dumps a waveform;
 ``timing`` measures each job's phases from it.  Every count and every response is checked
 against the NumPy golden (``hist_golden.py``) after both simulations.
@@ -103,7 +103,7 @@ def adaptor_rtl() -> list[Path]:
 class GenIncludeStep(BuildStep):
     """Generate include/: the kernel's message headers and Waveflow's adaptor headers."""
 
-    description = "Generate include/: HistCmd/HistResp from hist_schema.py, plus Waveflow's adaptors."
+    description = "Generate include/: HistCmd/HistDesc/HistResp, MemRCmd/MemWCmd, Waveflow's adaptors."
     consumes = ["schema_py"]
     produces = {"include_dir": Path(schema.INCLUDE_DIR)}
     params: ClassVar[dict] = {}
@@ -111,7 +111,7 @@ class GenIncludeStep(BuildStep):
     def run(self, config: BuildConfig, **_) -> dict:
         from waveflow.build.streamutils import MemStreamStep, StreamUtilsStep
         from waveflow.hw.dataschema import DataSchemaStep
-        from waveflow.hw.mem_stream import SCHEMA_CLASSES as MEM_SCHEMAS
+        from waveflow.hw.mem_stream import MemRCmd, MemWCmd
         from waveflow.hw.mem_stream import WORD_BW_SUPPORTED as MEM_WORD_BW
 
         include_dir = config.root_dir / schema.INCLUDE_DIR
@@ -119,12 +119,14 @@ class GenIncludeStep(BuildStep):
         inner = BuildDag()
         inner.add(StreamUtilsStep(output_dir=schema.INCLUDE_DIR))
         inner.add(MemStreamStep(output_dir=schema.INCLUDE_DIR))      # the adaptor task bodies
-        for cls in MEM_SCHEMAS:                                      # MRCmd, MWCmd, MemComplete
+        # framed=True adds read_framed_stream / write_framed_stream to each generated struct:
+        # the methods that put a message on an internal stream with a `last` bit on its final word.
+        for cls in (MemRCmd, MemWCmd):                               # the framed movers' commands
             inner.add(DataSchemaStep(cls, word_bw_supported=MEM_WORD_BW,
-                                     include_dir=schema.INCLUDE_DIR))
-        for cls in schema.SCHEMA_CLASSES:                            # HistCmd, HistResp
+                                     include_dir=schema.INCLUDE_DIR, framed=True))
+        for cls in schema.SCHEMA_CLASSES:                            # HistCmd, HistDesc, HistResp
             inner.add(DataSchemaStep(cls, word_bw_supported=schema.WORD_BW_SUPPORTED,
-                                     include_dir=schema.INCLUDE_DIR))
+                                     include_dir=schema.INCLUDE_DIR, framed=True))
         results = inner.run(config, force=True)
         failed = [name for name, r in results.items() if not r.success]
         if failed:
@@ -334,9 +336,10 @@ class XsiStep(BuildStep):
         rtl = sorted(vdir.glob("*.v"))
         if self.v.mm:                               # the hand-assembled top and the adaptor
             rtl += [_SOURCE_DIR / f for f in self.v.rtl] + adaptor_rtl()
-        # The waveform: the top's own nets, and for mm the kernel's inside it too.  XSim honours
-        # only the first $dumpvars, so mm dumps two levels from the top in one call: the top's
-        # nets and those of each instance in it (the kernel's FIFO strobes among them).
+        # The waveform: the top's own nets, and for mm the kernel's inside it too.  Of two nested
+        # scopes XSim dumps only the outer one (render_vcd_dumper refuses them), so mm dumps two
+        # levels from the top in one call: the top's nets and those of each instance in it (the
+        # kernel's FIFO strobes among them).
         dumper = render_vcd_dumper(top)
         if self.v.mm:
             dumper = dumper.replace(f"$dumpvars(1, {top});", f"$dumpvars(2, {top});")
@@ -430,13 +433,26 @@ class TimingStep(BuildStep):
             res = hist_timing.measure(
                 d / f"{self.v.rtl_top}_trace.vcd", self.v.scope, jobs,
                 golden.NBINS, len(golden.cmd_bursts(jobs)[0]), golden.resp_nwords(), out,
-                name=scenario, figure=(scenario == "back_to_back"), title=title)
+                name=scenario, figure=(scenario == "back_to_back"), title=title,
+                hdr_in=desc_nwords(), hdr_out=memw_nwords() + desc_nwords())
             print(f"{scenario}:")
             print(res["table"])
             if self.v.mm:
                 print(host_timing(d, res["rows"], out, scenario))
         print(f"Timeline: {(out / 'timeline.png').relative_to(config.root_dir).as_posix()}")
         return {"timing": out / "timing_isolated.json"}
+
+
+def desc_nwords() -> int:
+    """Words in one HistDesc on the kernel's streams: from the schema, never a literal."""
+    d = schema.HistDesc(job_id=0, status=schema.HistStatus.OK, n=0, shift=0, cnt_addr=0)
+    return len(d.serialize(word_bw=schema.MEM_DW))
+
+
+def memw_nwords() -> int:
+    """Words in one MemWCmd, the write mover's header."""
+    from waveflow.hw.mem_stream import MemWCmd
+    return len(MemWCmd(addr=0, len=0, fwd_bursts=0).serialize(word_bw=schema.MEM_DW))
 
 
 def host_timing(d: Path, rows: list[dict], out: Path, scenario: str) -> str:

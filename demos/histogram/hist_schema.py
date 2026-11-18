@@ -2,8 +2,9 @@
 
 This file is the single source of their layout.  The build's ``gen_include``
 step generates a C++ header from each schema (``hist_cmd.h``,
-``hist_resp.h``): a struct with the same fields and ``read_stream`` /
-``write_stream`` methods that pack it into 32-bit words.  The Python side
+``hist_desc.h``, ``hist_resp.h``): a struct with the same fields and
+``read_stream`` / ``write_stream`` (and framed / array) methods that pack it
+into 32-bit words.  The Python side
 packs the commands and unpacks the responses with the same schemas, so the
 kernel, the testbenches and the golden model cannot disagree about the bits.
 
@@ -12,7 +13,7 @@ receives a ``HistCmd`` on an AXI4-Stream and sends a ``HistResp`` on another;
 ``histogram_mm`` will read and write the same words from queues in memory.
 
 Every address in a command is a **word offset**, not a byte address: the
-memory adaptors take word offsets (``MRCmd.addr``, ``MWCmd.addr``), and the
+memory adaptors take word offsets (``MemRCmd.addr``, ``MemWCmd.addr``), and the
 kernel's ``m_axi`` ports start at address 0 (``offset=off``).
 """
 from __future__ import annotations
@@ -56,6 +57,25 @@ class HistCmd(DataList):
     include_dir = INCLUDE_DIR
 
 
+class HistDesc(DataList):
+    """The job descriptor: built once by the control task, then carried through the kernel.
+
+    It travels as a framed header ahead of the samples (the read mover relays it), then ahead of
+    the counts (the write mover buffers it across the write), and comes back on the write mover's
+    done stream once the counts are in memory.  Every task reads what it needs from it; none
+    rebuilds it.  A refused job carries ``n = 0`` and ``status = N_TOO_LARGE``.
+    """
+
+    elements = {
+        "job_id":   {"schema": Word32, "description": "The command's job ID"},
+        "status":   {"schema": HistStatusField, "description": "OK, or why the job was refused"},
+        "n":        {"schema": Word32, "description": "Samples to bin: 0 for a refused job"},
+        "shift":    {"schema": Word32, "description": "bin = min(x >> shift, NBINS - 1)"},
+        "cnt_addr": {"schema": Word32, "description": "Word offset of the NBINS counts"},
+    }
+    include_dir = INCLUDE_DIR
+
+
 class HistResp(DataList):
     """Sent once per job, after its counts are written."""
 
@@ -66,5 +86,5 @@ class HistResp(DataList):
     include_dir = INCLUDE_DIR
 
 
-#: The kernel's own messages.  The adaptors' (MRCmd, MWCmd, MemComplete) come from waveflow.
-SCHEMA_CLASSES = [HistStatusField, HistCmd, HistResp]
+#: The kernel's own messages.  The memory commands (MemRCmd, MemWCmd) come from waveflow.
+SCHEMA_CLASSES = [HistStatusField, HistCmd, HistDesc, HistResp]
