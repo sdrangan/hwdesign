@@ -783,12 +783,17 @@ def s_read_adaptor(ids):
     return [title_ph(ids, "The Read Adaptor"),
             kit.heading(ids, L, 1.75, 5.6, "THE COMMAND, MRCmd"),
             table(ids, L, 2.1, [1.4, 4.3], rows, rowh=0.5, sz=14),
-            label(ids, L, 4.75, 5.7, 0.9,
+            label(ids, L, 4.7, 5.7, 0.7,
                   "The write adaptor's `MWCmd` has the same fields.  Its data arrives on a stream "
                   "and is written from `addr` on.", sz=13, color=TEXT),
+            card(ids, L, 5.45, W, 0.8, [para(
+                "By convention the adaptors move **words**, the memory's width (here 64 bits), "
+                "not data types.  The kernel **packs** its values into words and **unpacks** "
+                "them: four 16-bit samples per word, say.  `len` counts words.", sz=14,
+                color=TEXT)], anchor="ctr"),
             kit.heading(ids, 6.75, 1.75, 5.8, "THE WHOLE ADAPTOR (SIMPLIFIED)"),
             lo.code(ids, 6.75, 2.1, 5.8, ADAPTOR_SRC, sz=11),
-            label(ids, 6.75, 5.1, 5.8, 0.8,
+            label(ids, 6.75, 4.7, 5.8, 0.7,
                   "Waveflow's `mem_r_stream_task.h`.  The `_done` variant then writes a "
                   "`MemComplete`: the word count and the tag.", sz=12),
             sldnum_ph(ids)]
@@ -1027,8 +1032,8 @@ def s_scale_practice(ids):
             lo.code(ids, L, 1.75, 6.6, SCALE_SKEL, sz=10.5),
             textbox(ids, 7.6, 1.75, 4.95, 4.4, [
                 para("One task reads a command with `x_off`, `y_off`, `n`, `a`, `b`, and drives "
-                     "a read and a write adaptor.  One element per word.", sz=15, color=TEXT,
-                     spcAft=6),
+                     "a read and a write adaptor.  x and y are 64-bit, the memory's width: "
+                     "one element per word.", sz=15, color=TEXT, spcAft=6),
                 part("(a)", "Fill in the read command", 15),
                 part("(b)", "Fill in the write command", 15),
                 part("(c)", "Write the loop, at II = 1", 15),
@@ -1041,7 +1046,9 @@ def s_scale_practice(ids):
 def s_scale_solution(ids):
     return [title_ph(ids, "Writing a Task: y = a·x + b"), pill(ids, "SOLUTION"),
             textbox(ids, L, 1.8, 6.4, 4.4, [
-                part("(a)", "`rc.addr = c.x_off; rc.len = c.n;` tag `c.job`", 15, spcBef=0),
+                part("(a)", "`rc.addr = c.x_off; rc.len = c.n;` tag `c.job`.  len = n only "
+                            "because each element fills a word: 16-bit x, four to a word, "
+                            "would need len = n/4 and a loop that unpacks", 15, spcBef=0),
                 part("(b)", "`wc.addr = c.y_off; wc.len = c.n;` tag `c.job`", 15),
                 part("(c)", "The loop on the right: one read and one write per iteration", 15),
                 part("(d)", "The writer only **queues** it: it writes each word as it arrives on "
@@ -1163,8 +1170,30 @@ def text_fixes(old):
     kit.fix(s[26], "fetch data as need<", "fetch data as needed<")
     kit.fix(s[19], "Later, we will show to map these into memory",
             "Section 3: the same streams, mapped into memory as queues")
+    # the three phase slides, told as the histogram
+    kit.fix(s[20], "<a:t>input data </a:t>", "<a:t>the samples </a:t>")
+    kit.fix(s[20], "Data to be processed", "The n samples to bin")
+    kit.fix(s[20], "<a:t>input command </a:t>", "<a:t>the command </a:t>")
+    kit.fix(s[20], "Input address:  Where data resides", "samp_off, n:  where the samples are")
+    kit.fix(s[20], "Output address:  Where output should reside",
+            "cnt_off:  where the counts should go")
+    kit.fix(s[20], "Command info:  What to do with data", "shift:  the bin width")
+    kit.fix(s[20], "<a:t>Input</a:t>", "<a:t>Samples</a:t>")
+    kit.fix(s[20], "<a:t>data</a:t>", "<a:t></a:t>")
+    kit.fix(s[21], "<a:t>input data </a:t>", "<a:t>the samples </a:t>")
+    kit.fix(s[21], "Uses input address sent in command", "n words at samp_off, from the command")
+    kit.fix(s[21], "Kernel processes input data", "Kernel bins each one:  counts[x >> shift]++")
+    kit.fix(s[21], "<a:t>Input</a:t>", "<a:t>Samples</a:t>")
+    kit.fix(s[21], "<a:t>data</a:t>", "<a:t></a:t>")
+    kit.fix(s[21], "<a:t>Computes </a:t>", "<a:t>Bins the </a:t>")
+    kit.fix(s[21], "<a:t>results</a:t>", "<a:t>samples</a:t>")
+    kit.fix(s[22], "<a:t>output data </a:t>", "<a:t>the counts </a:t>")
+    kit.fix(s[22], "Uses output address sent in command", "At cnt_off, from the command")
     kit.fix(s[22], "<a:t>Kernel sends </a:t>",
-            "<a:t>Kernel sends a response on the response stream</a:t>")
+            "<a:t>Kernel sends the response (job, status) on s_done</a:t>")
+    kit.fix(s[22], "<a:t>Output</a:t>", "<a:t>Counts</a:t>")
+    kit.fix(s[22], "<a:t>Input</a:t>", "<a:t>Samples</a:t>")
+    kit.fix(s[22], "<a:t>data</a:t>", "<a:t></a:t>", count=2)
     kit.fix(s[34], "Before write burst 0 completed", "Before burst 0 ends")
 
 
