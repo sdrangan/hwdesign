@@ -87,17 +87,16 @@ Cycles after each command's last word, each job run alone:
 
 | n | first sample (L) | last sample | last count | last write ack (B) | response |
 | --- | --- | --- | --- | --- | --- |
-| 256 | 23 | 293 | 335 | 360 | 355 |
-| 1024 | 23 | 1109 | 1151 | 1176 | 1171 |
-| 700 | 23 | 765 | 807 | 832 | 827 |
-| 70000 (refused) | - | - | - | - | 38 |
+| 256 | 23 | 293 | 335 | 360 | 380 |
+| 1024 | 23 | 1109 | 1151 | 1176 | 1196 |
+| 700 | 23 | 765 | 807 | 832 | 852 |
+| 70000 (refused) | - | - | - | - | 42 |
 
 The sample loop runs at II=1.  Back to back the jobs overlap: the next job's read starts
 while this one's counts are still being computed and written.
 
-**The response leaves 5 cycles before the bus acknowledges the last count.**  Waveflow's
-`mem_w_stream_done_task` writes its `MemComplete` once its loop has handed the last word to
-the `m_axi` port, in the same state that waits for the write response (`BVALID`), so the
-completion does not wait for it.  A host that reads the counts the moment the response arrives
-could, in principle, read them before they land.  This is the adaptor's behavior, not this
-kernel's; it is reported upstream rather than worked around here.
+**The response leaves 20 cycles after the bus acknowledges the last count.**  Waveflow's
+`mem_w_stream_done_task` fences its `MemComplete` behind the last write response (`B`): 4
+cycles for the fence, 12 for the 10-word `MemComplete` (8 words of it the cookie), 4 for the
+response task.  Requires the Waveflow write adaptor with the `hls::fence`; with the older
+adaptor the response left 5 cycles *before* `B`.

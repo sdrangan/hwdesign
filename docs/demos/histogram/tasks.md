@@ -130,9 +130,9 @@ static void hist_response(hls::stream<word_t>& wr_done, hls::stream<word_t>& res
 ```
 
 One write completion in, one response out. It waits for the write mover, not for the compute
-task, because a job is done only when its counts are in memory. (How closely the write mover's
-completion follows the memory's own acknowledgement is measured on the
-[stream page](stream.md#the-response-and-the-write-acknowledgement): it does not quite.)
+task, because a job is done only when its counts are in memory: the write mover sends its
+completion only after the memory acknowledges the last write (see the
+[stream page](stream.md#the-response-and-the-write-acknowledgement)).
 
 ## The data movers
 
@@ -141,7 +141,8 @@ The two memory tasks are Waveflow's, used as they are:
 - `mem_r_stream_task<32>`: read one `MRCmd`, then burst `len` words from `m_rd[addr]` onto
   `rd_data`, one per cycle.
 - `mem_w_stream_done_task<32>`: read one `MWCmd`, write `len` words from `wr_data` to
-  `m_wr[addr]`, then send a `MemComplete` carrying the command's cookie.
+  `m_wr[addr]`, wait for the memory's last write response, then send a `MemComplete` carrying
+  the command's cookie.
 
 Each owns one `m_axi` port and touches nothing else but streams. That split is a rule, not a
 style: a task that owns a memory port should do nothing but move words, so the tasks that hold

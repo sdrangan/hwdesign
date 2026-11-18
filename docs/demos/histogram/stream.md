@@ -83,10 +83,10 @@ command's last word was accepted:
 
 | `n` | first sample (L) | last sample | last count | first write request | last write ack (B) | response |
 | --- | --- | --- | --- | --- | --- | --- |
-| 256 | 23 | 293 | 335 | 325 | 360 | 355 |
-| 1024 | 23 | 1109 | 1151 | 1141 | 1176 | 1171 |
-| 700 | 23 | 765 | 807 | 797 | 832 | 827 |
-| 70000 (refused) | - | - | - | - | - | 38 |
+| 256 | 23 | 293 | 335 | 325 | 360 | 380 |
+| 1024 | 23 | 1109 | 1151 | 1141 | 1176 | 1196 |
+| 700 | 23 | 765 | 807 | 797 | 832 | 852 |
+| 70000 (refused) | - | - | - | - | - | 42 |
 
 Reading one row, `n` = 256:
 
@@ -105,9 +105,10 @@ Reading one row, `n` = 256:
 - **The write**: 32 counts in two bursts of 16. The write mover's first request goes out
   before the compute is done (cycle 325), as soon as it has buffered a burst; the memory
   acknowledges the last burst at cycle 360.
-- **The response** leaves at cycle 355.
+- **The response** leaves at cycle 380, 20 after the last acknowledgement. Its makeup is
+  [below](#the-response-and-the-write-acknowledgement).
 
-A refused job never touches memory; its response comes 38 cycles after its command.
+A refused job never touches memory; its response comes 42 cycles after its command.
 
 ![Each job's phases, measured from the RTL](images/timeline_stream.png)
 
@@ -116,22 +117,34 @@ A refused job never touches memory; its response comes 38 cycles after its comma
 Yes. The top of the figure is the back-to-back run. The control task accepts the next command
 as soon as it has sent this one's, so job 2's memory commands are already queued when job 1's
 read finishes. Job 2's read starts at cycle 324, while job 1 is still computing its counts
-(last at 341), writing them (to 366) and sending its response (361): the end of each job hides
+(last at 341), writing them (to 366) and sending its response (386): the end of each job hides
 behind the start of the next.
 
 The **read port** is the bottleneck. It is busy from one job's first sample to its last, then
 idle for 25 cycles while the read mover takes its next 11-word command and issues the first
-request; the compute task follows it sample for sample. All five jobs finish at cycle 3354,
-against 3563 for the same jobs one at a time.
+request; the compute task follows it sample for sample. All five jobs finish at cycle 3379,
+against 3667 for the same jobs one at a time.
 
 ## The response and the write acknowledgement
 
-In every job, the response leaves **5 cycles before the memory acknowledges the last count**
-(`BVALID`): 355 against 360 for `n` = 256. The write mover sends its `MemComplete` as soon as
-its loop has handed the last count to the `m_axi` port, in the same state where it waits for
-the acknowledgement, so the completion does not wait for it. On a real bus, a host that reads
-the counts the instant it gets the response could read them before they land. This is the
-behavior of Waveflow's write mover as it is today, not of the histogram's tasks.
+A job is done when its counts are in memory, and the memory says so with the write response
+(`B`) of the last burst. The write mover sends its `MemComplete` only after that response: an
+`hls::fence` between its write loop and its completion orders the two. Without the fence,
+Vitis sends the completion while it is still waiting for `B`, and the response would leave
+before the counts are known to have landed.
+
+For `n` = 256, from the last `B` at cycle 366 (absolute):
+
+| Cycles | What |
+| --- | --- |
+| 366 to 370 | the fence: the write mover sees `B` and starts its completion |
+| 370 to 381 | the 10-word `MemComplete` to the response task |
+| 382 to 386 | the response task reads its last word and sends the 2-word `HistResp` |
+
+So the response leaves 20 cycles after the counts are in memory. Twelve of those are the
+`MemComplete`, 10 words of which 8 are the cookie, and only 2 of them used. That cost is now
+on every job's critical path, because the completion can no longer be sent while the mover
+waits for `B`.
 
 ## What the testbench's memory hides
 

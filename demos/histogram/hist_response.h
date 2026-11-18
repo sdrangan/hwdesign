@@ -1,9 +1,8 @@
 // hist_response.h -- the response task: one write completion in, one HistResp out.
 //
-// The write adaptor sends its MemComplete after its loop has handed the job's last count to
-// the m_axi port.  The job id and status ride in the cookie the control task put in the
-// MWCmd; the adaptor echoes it without reading it.  Measured: the response leaves a few
-// cycles BEFORE the bus acknowledges the last write (B) -- see the demo's README.
+// The write adaptor sends its MemComplete only after the memory acknowledges the job's last
+// write (B), so the response means the counts are in memory.  The job id and status ride in
+// the cookie the control task put in the MWCmd; the adaptor echoes it without reading it.
 #ifndef HIST_RESPONSE_H
 #define HIST_RESPONSE_H
 #include "hist_types.h"
