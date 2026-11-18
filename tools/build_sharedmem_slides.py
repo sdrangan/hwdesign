@@ -4,8 +4,8 @@ WHAT THIS IS, AND WHAT IT IS NOT
 --------------------------------
 A *one-shot migration*, like tools/build_unroll_slides.py, whose pattern it
 follows (and through tools/build_loopopt_slides.py the drawing kit,
-tools/build_fifo_slides.py).  It reads the old deck, kept as
-units/unit09_sharedmem/sharedmem_v1.pptx, keeps the slides of its first
+tools/build_fifo_slides.py).  It reads the old deck -- not kept as a file, but
+read out of git as it was before the migration (V1_COMMIT) -- keeps the slides of its first
 section that are still right, builds the rest and writes a new deck.  Once the
 result is edited in PowerPoint this script is a record of what was done, not a
 way to rebuild it, and it refuses to run on its own output.
@@ -17,14 +17,17 @@ WHAT IT DOES
     transactions and the data mover; concurrent tasks, on the histogram; AXI4
     under the hood; memory-mapped queues.  All five are built; credit is
     unit 10's.
-    Sections 2 and 3 run on one example, a histogram (demos/histogram, branch
-    demo/histogram).  Section 2: the example, the protocol steps (the old
+    Sections 2 and 3 run on one example, a histogram (demos/histogram,
+    hist_simple; section 5 uses hist_mmqueue).  Section 2: the example, the protocol steps (the old
     phase slides), the data mover, the read and write transactions as sequence
     diagrams, a toy kernel (summem), and practice pairs on maxmem and on
-    drawing two reads.  Section 3: concurrent tasks, hls::task with the
-    histogram's top and its colour-mapped diagram, the control, compute and
-    response tasks' code, one job task by task, and its timing, measured from
-    the demo under XSI with the fenced write adaptor.
+    drawing two reads.  Section 3 (reworked 2026-11-18 onto hist_simple): concurrent
+    tasks, hls::task with the histogram's top -- one kernel task between the
+    two adaptors -- and its colour-mapped diagram, the kernel's code in two
+    halves, one job task by task, its timing, and the jobs running one at a
+    time back to back, with a practice pair on where the time goes: unit 10's
+    motivation.  The five-task version (control, compute and response tasks,
+    tags, jobs overlapping) is at the git tag unit9-hist-multitask.
     Section 4 is the old AXI4 signal slides, as reference.  The old deck's Vitis m_axi
     histogram (slides 36-47) is left out, to be rebuilt around Waveflow's
     adaptors in section 5.
@@ -56,13 +59,14 @@ From the repo root, with the deck closed in PowerPoint:
 
 Validate and render (PowerPoint draws what the class sees):
 
-    python <skill>/scripts/office/validate.py units/unit09_sharedmem/sharedmem.pptx \
-        --original units/unit09_sharedmem/sharedmem_v1.pptx
+    python <skill>/scripts/office/validate.py units/unit09_sharedmem/sharedmem.pptx
     tools/render_slides.ps1 -Deck units/unit09_sharedmem/sharedmem.pptx -OutDir out
+    tools/export_pdf.ps1 -Deck units/unit09_sharedmem/sharedmem.pptx   # the PDF students get
 """
 import argparse
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import zipfile
@@ -75,6 +79,9 @@ from build_fifo_slides import (AMBER, GRAYFILL, L, MUTED, SLATE, SLATETINT, TEAL
                                sldnum_ph, table, textbox, title_ph)
 
 ROOT = Path(__file__).resolve().parent.parent
+# The old deck this migration starts from is not kept as a file: it is the deck
+# as it was before the migration, read out of git.
+V1_COMMIT, V1_PATH = "db2ba4a", "units/unit09_sharedmem/sharedmem.pptx"
 UNIT = "Unit 9"
 OLD_UNIT = "Unit 8 "
 OLD_TITLE = "Shared Memory Transactions"
@@ -84,7 +91,9 @@ NEW_TITLE = "Kernels and Shared Memory"
 def _parse_args():
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--src", type=Path, default=ROOT / "units/unit09_sharedmem/sharedmem_v1.pptx")
+    p.add_argument("--src", type=Path, default=None,
+                   help="the pre-migration deck; by default it is taken from git, "
+                        f"{V1_COMMIT}:{V1_PATH}")
     p.add_argument("--out", type=Path, default=ROOT / "units/unit09_sharedmem/sharedmem.pptx")
     p.add_argument("--figs", type=Path, default=ROOT / "units/unit09_sharedmem/figs")
     p.add_argument("--work", type=Path, default=Path(tempfile.gettempdir()) / "sharedmem_build")
@@ -133,8 +142,8 @@ def s_objectives(ids):
             ["Estimate interconnect throughput",
              "Bound a job's transfer time on a bus and on a crossbar from the load on each port"],
             ["Design a transactional master",
-             "Reach memory through read and write commands on streams, matching each "
-             "completion to its command"],
+             "Reach memory through read and write commands on streams, and know when each "
+             "one is done"],
             ["Time memory transactions",
              "Estimate when bursts, and the whole job, complete from latency and burst length"],
             ["Use memory-mapped queues",
@@ -626,8 +635,8 @@ def _beats(ids, a, b, y, n, color, step=0.11, lw=1.25):
 
 
 TAG_NOTE = ("Both commands also carry a **tag**, `xfer_len` and `xfer_msg`, echoed back unread.  "
-            "We need it later: when the response goes to a **different kernel** than the one "
-            "that asked.")
+            "In this unit `xfer_len = 0`.  Unit 10 uses it, when the completion goes to a "
+            "**different task** than the one that asked.")
 
 
 def s_read_txn(ids):
@@ -993,6 +1002,16 @@ def s_concurrent(ids):
     return out
 
 
+# Names and paths from the demo, demos/histogram: hist_simple (section 3) and
+# hist_mmqueue (section 5).  See HIST_TOP below.
+HIST_KERNEL_NAME = "hist_compute"
+HIST_TOP_PATH = "demos/histogram/simple/hist_simple.cpp"
+HIST_MM_PATH = "demos/histogram/mmqueue/hist_mmqueue.v"
+HIST_MM_TB_PATH = "demos/histogram/mmqueue/tb_xsi_hist_mmqueue.cpp"
+# hist_mmqueue under XSI, five commands pushed at once: the cycle by which all
+# are in the queue, and the cycles the kernel takes each.
+MMQ = dict(all_in=53, taken="17, 413, 1625, 2493 and 2501")
+
 TOP_SRC = """
 void copy_top(hls::stream<word_t>& s_cmd,
               const word_t* m_in, word_t* m_out,
@@ -1016,7 +1035,7 @@ void copy_top(hls::stream<word_t>& s_cmd,
 def s_hls_task(ids):
     return [title_ph(ids, "Concurrent Tasks in Vitis: hls::task"),
             lo.code(ids, L, 1.75, 7.1, HIST_TOP, sz=9.5),
-            label(ids, L, 5.85, 7.1, 0.35, "The histogram's top, demos/histogram/histogram_stream.cpp "
+            label(ids, L, 5.85, 7.1, 0.35, f"The histogram's top, {HIST_TOP_PATH} "
                   "(long lines wrapped).  `t_rd` and `t_wr` are Waveflow's adaptors.", sz=11),
             textbox(ids, 8.15, 1.75, 4.4, 4.3, [
                 kit.bullet("The top **declares channels and tasks**, and computes nothing", sz=15,
@@ -1033,10 +1052,9 @@ def s_hls_task(ids):
 # One colour per role, the same in the code and in the drawing.
 EXT_C, TASK_C, STREAM_C = SLATE, VIOLET, TEAL
 ROLE = {**{t: EXT_C for t in ("s_cmd", "s_done", "m_rd", "m_wr")},
-        **{t: TASK_C for t in ("t_ctrl", "t_rd", "t_comp", "t_wr", "t_resp", "hist_control",
-                               "hist_compute", "hist_response", "mem_r_stream_task",
+        **{t: TASK_C for t in ("t_rd", "t_comp", "t_wr", HIST_KERNEL_NAME, "mem_r_stream_task",
                                "mem_w_stream_done_task")},
-        **{t: STREAM_C for t in ("rd_cmd", "wr_cmd", "rd_data", "wr_data", "wr_done", "job")}}
+        **{t: STREAM_C for t in ("rd_cmd", "wr_cmd", "rd_data", "wr_data", "wr_done")}}
 _TOKEN = re.compile(r"\b(" + "|".join(sorted(ROLE, key=len, reverse=True)) + r")\b")
 
 
@@ -1072,41 +1090,36 @@ def _task_box(ids, x, y, w, h, name, role_text):
 
 
 def s_top_mapped(ids):
-    bw, bh = 1.15, 0.6
-    xr, xc, xw = 7.85, 9.625, 11.4                   # read, compute and write columns
-    yt, ym = 2.45, 3.7                               # control row, adaptor row
+    bw, y0, bh = 1.0, 2.75, 1.3                      # a row of three tall task boxes
+    xr, xc, xw = 7.85, 9.7, 11.55                    # read adaptor, kernel, write adaptor
     cr, cc, cw = xr + bw / 2, xc + bw / 2, xw + bw / 2
+
+    def stream(x1, x2, y, name, rightward):
+        a, b = (x1, x2) if rightward else (x2, x1)
+        return [arrow(ids, a, y, b, y, STREAM_C, lw=2.0),
+                label(ids, x1 - 0.05, y - 0.27, x2 - x1 + 0.1, 0.26, name, sz=10, color=STREAM_C,
+                      b=True, align="ctr")]
+
     out = [title_ph(ids, "Reading the Top: Code and Hardware"),
            colour_code(ids, L, 1.75, 6.95, HIST_TOP, sz=9.5),
-           _role_box(ids, xr, 1.75, bw, 0.38, "s_cmd", EXT_C, sz=12),
-           _task_box(ids, xr, yt, bw, bh, "t_ctrl", "control"),
-           _task_box(ids, xr, ym, bw, bh, "t_rd", "read adaptor"),
-           _task_box(ids, xc, ym, bw, bh, "t_comp", "compute"),
-           _task_box(ids, xw, ym, bw, bh, "t_wr", "write adaptor"),
-           _task_box(ids, xc, 4.75, bw, bh, "t_resp", "response"),
-           _role_box(ids, xr + 0.025, 4.85, 1.1, 0.38, "m_rd", EXT_C, sz=12),
-           _role_box(ids, 11.95, 4.85, 0.6, 0.38, "m_wr", EXT_C, sz=11),
-           _role_box(ids, xc + 0.025, 5.6, 1.1, 0.35, "s_done", EXT_C, sz=12),
+           _role_box(ids, xc, 1.75, bw, 0.38, "s_cmd", EXT_C, sz=12),
+           _task_box(ids, xr, y0, bw, bh, "t_rd", "read adaptor"),
+           _task_box(ids, xc, y0, bw, bh, "t_comp", "kernel"),
+           _task_box(ids, xw, y0, bw, bh, "t_wr", "write adaptor"),
+           _role_box(ids, xr, 4.7, bw, 0.38, "m_rd", EXT_C, sz=12),
+           _role_box(ids, xc, 4.7, bw, 0.38, "s_done", EXT_C, sz=12),
+           _role_box(ids, xw, 4.7, bw, 0.38, "m_wr", EXT_C, sz=12),
            # to and from the outside
-           arrow(ids, cr, 2.13, cr, yt, EXT_C, lw=1.75),
-           arrow(ids, cr, 4.85, cr, ym + bh, EXT_C, lw=1.75),
-           arrow(ids, 12.25, ym + bh, 12.25, 4.85, EXT_C, lw=1.75),
-           arrow(ids, cc, 5.35, cc, 5.6, EXT_C, lw=1.75),
-           # streams between tasks
-           arrow(ids, cr, yt + bh, cr, ym, STREAM_C, lw=2.0),
-           arrow(ids, xr + bw, 2.95, cc, ym, STREAM_C, lw=2.0),
-           arrow(ids, xr + bw, 2.7, cw, ym, STREAM_C, lw=2.0),
-           arrow(ids, xr + bw, ym + bh / 2, xc, ym + bh / 2, STREAM_C, lw=2.0),
-           arrow(ids, xc + bw, ym + bh / 2, xw, ym + bh / 2, STREAM_C, lw=2.0),
-           arrow(ids, 11.6, ym + bh, xc + bw, 5.05, STREAM_C, lw=2.0),
-           label(ids, cr + 0.05, 3.15, 0.75, 0.28, "rd_cmd", sz=11, color=STREAM_C, b=True),
-           label(ids, 9.75, 2.95, 0.5, 0.28, "job", sz=11, color=STREAM_C, b=True),
-           label(ids, 10.55, 2.6, 0.9, 0.28, "wr_cmd", sz=11, color=STREAM_C, b=True),
-           label(ids, xr + bw - 0.06, ym + bh / 2 + 0.03, 0.75, 0.28, "rd_data", sz=10, color=STREAM_C,
-                 b=True, align="ctr"),
-           label(ids, xc + bw - 0.06, ym + bh / 2 + 0.03, 0.75, 0.28, "wr_data", sz=10, color=STREAM_C,
-                 b=True, align="ctr"),
-           label(ids, 10.9, 5.15, 0.9, 0.28, "wr_done", sz=11, color=STREAM_C, b=True)]
+           arrow(ids, cc, 2.13, cc, y0, EXT_C, lw=1.75),
+           arrow(ids, cr, 4.7, cr, y0 + bh, EXT_C, lw=1.75),
+           arrow(ids, cc, y0 + bh, cc, 4.7, EXT_C, lw=1.75),
+           arrow(ids, cw, y0 + bh, cw, 4.7, EXT_C, lw=1.75),
+           # streams between tasks: the kernel asks, the adaptors answer
+           *stream(xr + bw, xc, 3.25, "rd_cmd", False),
+           *stream(xr + bw, xc, 3.8, "rd_data", True),
+           *stream(xc + bw, xw, 3.15, "wr_cmd", True),
+           *stream(xc + bw, xw, 3.6, "wr_data", True),
+           *stream(xc + bw, xw, 3.98, "wr_done", False)]
     lx = L
     for name, role in (("external interface", EXT_C), ("task", TASK_C),
                        ("stream between tasks", STREAM_C)):
@@ -1184,36 +1197,6 @@ def s_read_adaptor(ids):
             label(ids, 6.75, 4.7, 5.8, 0.7,
                   "Waveflow's `mem_r_stream_task.h`.  The `_done` variant then writes a "
                   "`MemComplete`: the word count and the tag.", sz=12),
-            sldnum_ph(ids)]
-
-
-def s_tags(ids):
-    fb = kit.field_bar
-    return [title_ph(ids, "Tags: Matching Completions"),
-            col(ids, L, 6.1, [
-                "Every command carries a **tag**, `xfer_msg`",
-                "The adaptor **echoes it** on the completion, unread",
-                "The requester decides what it means",
-                ("-", "A job number, which buffer, who asked"),
-                "So several jobs can be **in flight**, and an arbiter can merge requesters "
-                "without remembering who asked what",
-                "The stage that issues a read need not be the one that takes the data: "
-                "the start of **task pipelining** (unit 10)"],
-                h=4.1, sz=16, sub=14),
-            kit.heading(ids, 7.2, 1.8, 5.3, "COMMAND"),
-            *fb(ids, 7.2, 2.1, 0.55, [
-                (1.5, TINT, TEXT, [("addr 512", 13, False)]),
-                (1.4, TINT, TEXT, [("len 64", 13, False)]),
-                (1.9, TEALTINT, TEAL, [("tag: job 7", 13, True)])]),
-            arrow(ids, 9.85, 2.75, 9.85, 3.45, SLATE, lw=1.75),
-            label(ids, 10.0, 2.85, 2.5, 0.4, "the adaptor runs the burst", sz=12),
-            kit.heading(ids, 7.2, 3.5, 5.3, "COMPLETION"),
-            *fb(ids, 7.2, 3.8, 0.55, [
-                (2.9, TINT, TEXT, [("len 64", 13, False)]),
-                (1.9, TEALTINT, TEAL, [("tag: job 7", 13, True)])]),
-            card(ids, 7.2, 4.65, 4.8, 1.05, [para(
-                "Industry: AXI's own **transaction IDs** (ARID, AWID) do this inside the "
-                "interconnect; NVMe and NICs use **completion queues**.", sz=13, color=TEXT)]),
             sldnum_ph(ids)]
 
 
@@ -1296,8 +1279,8 @@ def s_hist_example(ids):
     # a small histogram, for the eye
     for k, hgt in enumerate([0.2, 0.45, 0.75, 0.95, 0.65, 0.35, 0.15]):
         out.append(shape(ids, 7.2 + k * 0.17, 3.85 - hgt, 0.14, hgt, fill=VIOLET, line=None))
-    out += [band(ids, "`histogram_stream`: command and response on **streams**.  Section 5: the "
-                      "same kernel behind memory-mapped queues, `histogram_mm`.",
+    out += [band(ids, "`hist_simple`: command and response on **streams**.  Section 5: the "
+                      "same kernel behind memory-mapped queues, `hist_mmqueue`.",
                  y=5.45, h=0.7, sz=15),
             sldnum_ph(ids)]
     return out
@@ -1325,189 +1308,184 @@ def s_hist_format(ids):
             sldnum_ph(ids)]
 
 
-HIST_TOP = """
-void histogram_stream(hls::stream<word_t>& s_cmd,
-                      const word_t* m_rd, word_t* m_wr,
-                      hls::stream<word_t>& s_done) {
-#pragma HLS INTERFACE axis  port=s_cmd
-#pragma HLS INTERFACE m_axi port=m_rd offset=off bundle=gmem0
-#pragma HLS stable variable=m_rd
-#pragma HLS INTERFACE m_axi port=m_wr offset=off bundle=gmem1
-#pragma HLS stable variable=m_wr
-#pragma HLS INTERFACE axis  port=s_done
-#pragma HLS INTERFACE ap_ctrl_none port=return
-    hls_thread_local hls::stream<word_t, 16> rd_cmd, wr_cmd;
-    hls_thread_local hls::stream<word_t> rd_data, wr_data, wr_done;
-    hls_thread_local hls::stream<HistJob, 2> job;
+# hist_simple: one kernel task between Waveflow's two adaptors.  The top and the
+# kernel are demos/histogram/simple/hist_simple.cpp, verbatim but for wrapped
+# lines (ebff8b0 on demo/hist-simple).  The numbers below are its XSI run.
+DRAFT = False
 
-    hls_thread_local hls::task t_ctrl(hist_control,
-                                      s_cmd, rd_cmd, job, wr_cmd);
+HIST_TOP = """
+void hist_simple(hls::stream<word_t>& s_cmd,
+                 const word_t* m_rd, word_t* m_wr,
+                 hls::stream<word_t>& s_done) {
+#pragma HLS INTERFACE axis port=s_cmd
+#pragma HLS INTERFACE m_axi port=m_rd offset=off bundle=gmem0 depth=65536
+#pragma HLS stable variable=m_rd
+#pragma HLS INTERFACE m_axi port=m_wr offset=off bundle=gmem1 depth=65536
+#pragma HLS stable variable=m_wr
+#pragma HLS INTERFACE axis port=s_done
+#pragma HLS INTERFACE ap_ctrl_none port=return
+    hls_thread_local hls::stream<word_t> rd_cmd, rd_data,
+                                         wr_cmd, wr_data, wr_done;
+
     hls_thread_local hls::task t_rd(mem_r_stream_task<MEM_DW>,
                                     rd_cmd, m_rd, rd_data);
-    hls_thread_local hls::task t_comp(hist_compute, job, rd_data, wr_data);
+    hls_thread_local hls::task t_comp(hist_compute, s_cmd, s_done,
+                                      rd_cmd, rd_data,
+                                      wr_cmd, wr_data, wr_done);
     hls_thread_local hls::task t_wr(mem_w_stream_done_task<MEM_DW>,
                                     wr_cmd, wr_data, m_wr, wr_done);
-    hls_thread_local hls::task t_resp(hist_response, wr_done, s_done);
 }"""
 
-HIST_CTRL = """
-void hist_control(hls::stream<word_t>& cmd_in,
-                  hls::stream<word_t>& rd_cmd,
-                  hls::stream<HistJob>& job,
-                  hls::stream<word_t>& wr_cmd) {
+# The kernel, in two halves: the command and the read request; then bin, write,
+# wait and respond.
+HIST_KERNEL_A = """
+static void hist_compute(
+        hls::stream<word_t>& s_cmd, hls::stream<word_t>& s_done,
+        hls::stream<word_t>& rd_cmd, hls::stream<word_t>& rd_data,
+        hls::stream<word_t>& wr_cmd, hls::stream<word_t>& wr_data,
+        hls::stream<word_t>& wr_done) {
     HistCmd cmd;
-    cmd.read_stream<MEM_DW>(cmd_in);
-    const bool ok = (cmd.n <= MAX_N);
+    cmd.read_stream<MEM_DW>(s_cmd);
+    HistResp resp;
+    resp.job_id = cmd.job_id;
+    resp.status = (cmd.n <= MAX_N) ? HistStatus::OK
+                                   : HistStatus::N_TOO_LARGE;
 
-    if (ok) {                       // read n samples from data_addr
-        MRCmd rc;
-        rc.addr = cmd.data_addr;  rc.len = cmd.n;  rc.xfer_len = 0;
+    if (resp.status == HistStatus::OK) {  // a refused job touches no memory
+        MRCmd rc;                         // load: n samples from data_addr
+        rc.addr = cmd.data_addr;
+        rc.len = cmd.n;
+        rc.xfer_len = 0;                  // no tag (unit 10 uses one)
         rc.write_stream<MEM_DW>(rd_cmd);
-    }
-    HistJob j;                      // a refused job reads 0, emits nothing
-    j.n = ok ? (int)cmd.n : 0;  j.shift = cmd.shift;  j.emit = ok;
-    job.write(j);
 
-    MWCmd wc;                       // write NBINS counts to cnt_addr
-    wc.addr = cmd.cnt_addr;  wc.len = ok ? NBINS : 0;  wc.xfer_len = 2;
-    wc.xfer_msg.data[XFER_JOB_ID] = cmd.job_id;
-    wc.xfer_msg.data[XFER_STATUS] =
-        (int)(ok ? HistStatus::OK : HistStatus::N_TOO_LARGE);
-    wc.write_stream<MEM_DW>(wr_cmd);
-}"""
-
-HIST_COMP = """
-void hist_compute(hls::stream<HistJob>& job,
-                  hls::stream<word_t>& samples,
-                  hls::stream<word_t>& counts_out) {
-    count_t counts[NBINS];
+        count_t counts[NBINS];
 #pragma HLS ARRAY_PARTITION variable=counts complete
-    const HistJob j = job.read();
-CLEAR: for (int b = 0; b < NBINS; b++) {
+    CLEAR: for (int b = 0; b < NBINS; b++) {
 #pragma HLS UNROLL
-        counts[b] = 0;
-    }
-SAMPLES: for (int i = 0; i < (int)j.n; i++) {
+            counts[b] = 0;
+        }"""
+
+HIST_KERNEL_B = """
+    SAMPLES: for (int i = 0; i < (int)cmd.n; i++) {       // compute
 #pragma HLS PIPELINE II=1
-        const word_t x = samples.read();
-        const word_t bin = x >> j.shift;
-        counts[bin < NBINS ? (int)bin : NBINS - 1]++;
-    }
-    if (j.emit) {
+            const word_t bin = rd_data.read() >> cmd.shift;
+            counts[bin < NBINS ? (int)bin : NBINS - 1]++;
+        }
+
+        MWCmd wc;                         // store: NBINS counts to cnt_addr
+        wc.addr = cmd.cnt_addr;
+        wc.len = NBINS;
+        wc.xfer_len = 0;
+        wc.write_stream<MEM_DW>(wr_cmd);
     COUNTS: for (int b = 0; b < NBINS; b++) {
 #pragma HLS PIPELINE II=1
-            counts_out.write(counts[b]);
+            wr_data.write(counts[b]);
         }
+
+        MemComplete done;                 // wait: the counts are in memory
+        done.read_stream<MEM_DW>(wr_done);
     }
+    resp.write_stream<MEM_DW>(s_done);
 }"""
 
-HIST_RESP = """
-void hist_response(hls::stream<word_t>& wr_done,
-                   hls::stream<word_t>& resp_out) {
-    MemComplete done;
-    done.read_stream<MEM_DW>(wr_done);
-    HistResp resp;
-    resp.job_id = done.xfer_msg.data[XFER_JOB_ID];
-    resp.status = (HistStatus)(int)done.xfer_msg.data[XFER_STATUS];
-    resp.write_stream<MEM_DW>(resp_out);
-}"""
-
-HIST_SRC_NOTE = "demos/histogram, task bodies as in the demo; long lines wrapped."
+HIST_SRC_NOTE = f"{HIST_TOP_PATH}: the kernel as in the demo; long lines wrapped."
+DRAFT_CODE = "the code is being finalised in demos/histogram (hist_simple)."
+DRAFT_TIMES = "illustrative cycle counts until hist_simple is measured under XSI."
 
 
-def s_hist_ctrl(ids):
-    return [title_ph(ids, "The Control Task"),
-            lo.code(ids, L, 1.75, 7.2, HIST_CTRL, sz=10),
-            textbox(ids, 8.25, 1.75, 4.3, 4.3, [
-                kit.bullet("One command in; out: a command to **each adaptor** and a **job** "
-                           "descriptor to compute", sz=14, spcBef=0),
-                kit.bullet("Owns **no memory port**: it only writes messages", sz=14),
-                kit.bullet("The job id and status ride in the **write command's tag**: the "
-                           "write adaptor echoes them to the response task", sz=14),
-                kit.bullet("A refused job (n > 65,535) reads and writes nothing, but still gets "
-                           "a response", sz=14)]),
-            label(ids, L, 6.15, W, 0.3, HIST_SRC_NOTE, sz=11),
+def _src_note(ids, draft_text):
+    return (draft_note(ids, draft_text, y=6.15) if DRAFT
+            else label(ids, L, 6.15, W, 0.3, HIST_SRC_NOTE, sz=11))
+
+
+def s_hist_kernel_load(ids):
+    return [title_ph(ids, "The Kernel: Command and Read Request"),
+            colour_code(ids, L, 1.7, 7.4, HIST_KERNEL_A, sz=9),
+            textbox(ids, 8.45, 1.75, 4.1, 4.3, [
+                kit.bullet("**One task runs the whole job**, step by step, like `summem`", sz=14,
+                           spcBef=0),
+                kit.bullet("It reads the command and decides the response's status at once", sz=14),
+                kit.bullet("One `MRCmd`: where the samples are and how many.  `xfer_len = 0`: no "
+                           "tag", sz=14),
+                kit.bullet("A refused job (n > 65,535) sends no command at all, but still "
+                           "responds", sz=14),
+                kit.bullet("The 32 counts are **registers** (`ARRAY_PARTITION complete`), "
+                           "cleared in one cycle", sz=14)]),
+            _src_note(ids, DRAFT_CODE),
             sldnum_ph(ids)]
 
 
-def s_hist_compute(ids):
-    return [title_ph(ids, "The Compute Task"),
-            lo.code(ids, L, 1.75, 6.6, HIST_COMP, sz=10),
-            textbox(ids, 7.65, 1.75, 4.9, 4.3, [
-                kit.bullet("**Streams only**: samples in, counts out.  It never sees an address",
-                           sz=14, spcBef=0),
-                kit.bullet("Takes each sample **as it arrives** from the read adaptor", sz=14),
-                kit.bullet("`counts[bin]++` is a read-modify-write: a repeat of the last bin "
-                           "depends on it (unit 7)", sz=14),
-                kit.bullet("The 32 counts are **registers** (`ARRAY_PARTITION complete`): "
-                           "read, add and write fit in a cycle, **II = 1**", sz=14),
-                kit.bullet("In a block RAM, Vitis still reports II = 1 but warns the chain "
-                           "misses the 10 ns clock (HLS 200-887)", sz=14)]),
-            label(ids, L, 6.15, W, 0.3, HIST_SRC_NOTE, sz=11),
+def s_hist_kernel_store(ids):
+    return [title_ph(ids, "The Kernel: Bin, Write, Wait, Respond"),
+            colour_code(ids, L, 1.7, 7.4, HIST_KERNEL_B, sz=9.5),
+            textbox(ids, 8.45, 1.75, 4.1, 2.7, [
+                kit.bullet("**Exactly n** reads of `rd_data`, each binned as it arrives: "
+                           "**II = 1**", sz=14, spcBef=0),
+                kit.bullet("An `MWCmd`, then the 32 counts on `wr_data`", sz=14),
+                kit.bullet("Then it **waits** for the write adaptor's `MemComplete`, and only "
+                           "then responds", sz=14)]),
+            card(ids, 8.45, 4.5, 4.1, 1.55, [
+                para("**Why wait?**", sz=14, color=TEXT, spcAft=4),
+                para("The last count leaving the kernel is not the last count **in memory**.  "
+                     "Only the memory's write response (B) says so, and the adaptor turns it "
+                     "into `MemComplete`.", sz=13, color=TEXT)]),
+            _src_note(ids, DRAFT_CODE),
             sldnum_ph(ids)]
 
 
-def s_hist_resp(ids):
-    return [title_ph(ids, "The Response Task"),
-            lo.code(ids, L, 1.75, 7.2, HIST_RESP, sz=11),
-            textbox(ids, 8.25, 1.75, 4.3, 3.0, [
-                kit.bullet("Waits for the **write adaptor's completion**", sz=15, spcBef=0),
-                kit.bullet("Its tag carries the job id and status the control task put "
-                           "there", sz=15),
-                kit.bullet("So the response is sent once the counts are **in memory**: after "
-                           "the last burst's write response (B)", sz=15)]),
-            card(ids, L, 4.4, 7.2, 1.3, [
-                para("**Why a separate task?**", sz=15, color=TEXT, spcAft=4),
-                para("Only the write adaptor knows when the counts have been written.  The "
-                     "compute task's last count leaves before it lands.", sz=14, color=TEXT)]),
-            label(ids, 8.25, 4.45, 4.3, 1.3,
-                  "Measured: the response leaves **20 cycles** after the last B.  4 for the "
-                  "adaptor to see it, 12 for the 10-word completion, 4 for this task.",
-                  sz=13, color=TEXT),
-            sldnum_ph(ids)]
+# Measured: hist_simple under XSI, one job alone, n = 256, cycles from the
+# command's last word (demos/histogram, ebff8b0).  rc: MRCmd written (1-13);
+# ar: read request; first/last: first and last sample; bin1: last sample
+# binned; wc0/wc1: MWCmd written; cnt0/cnt1: first and last count leaves the
+# kernel; aw: write request; wlast: last W beat; b: last B; done0/done:
+# MemComplete (after a 5-cycle fence); resp: response written.
+HM = dict(n=256, rc=13, ar=22, first=23, last=293, bin0=28, bin1=298, wc0=302, wc1=314,
+          cnt0=317, cnt1=349, aw=339, wlast=373, b=374, done0=379, done=390, resp=392,
+          period=396)                            # the next job's command, back to back
+HM_N = {256: 392, 700: 864, 1024: 1208}          # one job alone, response cycle
+HM_FIXED = 97                                    # job ≈ L + n·17/16 + 97, for all three
+# Five jobs (n = 256, 1024, 700, refused, 1024), first command word to last
+# response word: back to back, and the sum of the same jobs run alone.
+B2B = dict(jobs=5, total=3698, isolated=3702)
+HIST_MEASURED = ("Measured: demos/histogram, hist_simple under XSI, 100 MHz; cycles from the "
+                 "command's last word.  The testbench memory answers in a cycle.")
 
 
-# Measured, demos/histogram (histogram_stream under XSI, the fenced write
-# adaptor), n = 256, each job alone, cycles from the command's last word:
-# MRCmd written 1-13, read request 22, first sample 23 (L), compute from 28,
-# last sample 293, last count 335, first write request 325, last B 360,
-# response 380 (4 fence + 12 MemComplete + 4 response task).
-HM = dict(L=23, n=256, last=293, comp0=28, cnt0=303, cnt1=335, aw=325, b=360, resp=380)
-HIST_MEASURED = ("Measured: demos/histogram, histogram_stream under XSI, 100 MHz; cycles from "
-                 "the command's last word.  The testbench memory answers in a cycle.")
+def _measured_note(ids, extra=""):
+    return (draft_note(ids, DRAFT_TIMES, y=6.2) if DRAFT
+            else label(ids, L, 6.2, W, 0.32, HIST_MEASURED + extra, sz=11))
 
 
 def s_job_tasks(ids):
-    """One job, task by task: the measured cycles of HM."""
+    """One job, task by task: the cycles of HM."""
     m = HM
     cmd, data, comp = (SLATE, WHITE), (TEAL, WHITE), (VIOLET, WHITE)
     lat, wait = (kit.AMBERTINT, AMBER), ("F4F4F4", MUTED)
     rows = [
-        ("t_ctrl  control", [(0, 13, "", *cmd), (13, 24, "", *cmd)]),
-        ("t_rd  read", [(0, m["L"], "L", *lat),
-                        (m["L"], m["last"], f"{m['n']} samples, 16 bursts of 16", *data)]),
-        ("t_comp  compute", [(13, m["comp0"], "", *wait),
-                             (m["comp0"], m["last"] + 5, "bins each sample as it arrives", *comp),
-                             (m["cnt0"], m["cnt1"], "", *data)]),
-        ("t_wr  write", [(24, m["cnt0"], "has its command: waits for the counts", *wait),
-                         (m["cnt0"], m["aw"], "", *data), (m["aw"], m["b"], "", *lat)]),
-        ("t_resp  response", [(0, m["b"] + 4, "waits for the write's completion", *wait),
-                              (m["b"] + 4, m["resp"], "", *cmd)]),
+        ("t_comp  kernel", [(1, m["rc"], "", *cmd), (m["rc"], m["bin0"], "", *wait),
+                            (m["bin0"], m["bin1"], f"bins {m['n']} samples as they arrive",
+                             *comp),
+                            (m["wc0"], m["wc1"], "", *cmd), (m["cnt0"], m["cnt1"], "", *data),
+                            (m["cnt1"], m["done"], "waits", *wait),
+                            (m["done"], m["resp"], "", *cmd)]),
+        ("t_rd  read", [(m["rc"], m["first"], "L", *lat),
+                        (m["first"], m["last"], f"{m['n']} samples", *data)]),
+        ("t_wr  write", [(m["wc0"], m["wc1"], "", *cmd), (m["cnt0"], m["wlast"], "counts", *data),
+                         (m["wlast"], m["done0"], "", *lat), (m["done0"], m["done"], "", *cmd)]),
     ]
     out = [title_ph(ids, "One Job, Task by Task"),
-           *gantt(ids, rows, m["resp"] + 6, [0, m["L"], m["last"], m["cnt1"], m["resp"]],
-                  x=L, y=1.75, w=W, lab_w=1.85, row_h=0.5, gap=0.13)]
+           *gantt(ids, rows, m["resp"] + 6, [0, m["first"], m["last"], m["cnt1"], m["resp"]],
+                  x=L, y=1.85, w=W, lab_w=1.85, row_h=0.6, gap=0.18)]
     lx = L
     for name, fill in (("command or response", SLATE), ("samples or counts", TEAL),
-                       ("compute", VIOLET), ("latency or burst", kit.AMBERTINT),
-                       ("waiting for input", "F4F4F4")):
-        out.append(shape(ids, lx, 5.22, 0.3, 0.22, fill=fill, line=kit.GRAYLINE, lw=0.5))
-        out.append(label(ids, lx + 0.38, 5.17, 2.0, 0.3, name, sz=12, color=TEXT))
+                       ("compute", VIOLET), ("latency (L, B)", kit.AMBERTINT),
+                       ("waiting", "F4F4F4")):
+        out.append(shape(ids, lx, 4.6, 0.3, 0.22, fill=fill, line=kit.GRAYLINE, lw=0.5))
+        out.append(label(ids, lx + 0.38, 4.55, 2.0, 0.3, name, sz=12, color=TEXT))
         lx += 2.35
-    out += [band(ids, "Each task works only when its input arrives.  Compute runs **under the "
-                      "read**; the writer starts its first burst before the last count.", y=5.6,
-                 h=0.55, sz=15),
-            label(ids, L, 6.2, W, 0.32, HIST_MEASURED + "  n = 256.", sz=11),
+    out += [band(ids, "The adaptors are busy at once with the kernel, but **one job at a time**: "
+                      "read, then write, then respond.", y=5.15, h=0.6, sz=15),
+            _measured_note(ids, f"  n = {m['n']}."),
             sldnum_ph(ids)]
     return out
 
@@ -1515,42 +1493,153 @@ def s_job_tasks(ids):
 def s_hist_timing(ids):
     m = HM
     lat = (GRAYFILL, TEXT)
-    rows = [("Read samples", [(0, m["L"], "L", *lat),
-                              (m["L"], m["last"], f"{m['n']} samples", TEAL, WHITE)]),
-            ("Compute", [(m["comp0"], m["last"] + 5, "as the samples arrive", VIOLET, WHITE),
-                         (m["cnt0"], m["cnt1"], "", TEAL, WHITE)]),
+    tail_cnt, tail_wr, tail_rsp = m["cnt1"] - m["last"], m["b"] - m["cnt1"], m["resp"] - m["b"]
+    rows = [("Read samples", [(0, m["first"], "L", *lat),
+                              (m["first"], m["last"], f"{m['n']} samples", TEAL, WHITE)]),
+            ("Kernel", [(m["bin0"], m["bin1"], "as they arrive", VIOLET, WHITE),
+                        (m["cnt0"], m["cnt1"], "", TEAL, WHITE)]),
             ("Write counts", [(m["aw"], m["b"], "", AMBER, WHITE)]),
-            ("Response", [(m["b"], m["resp"], "", SLATE, WHITE)])]
+            ("Wait, respond", [(m["b"], m["resp"], "", SLATE, WHITE)])]
     return [title_ph(ids, "Timing a Histogram Job"),
             col(ids, L, 4.9, [
-                "The read: **L = 23**, then a sample a cycle (plus one per 16-word burst)",
-                ("-", "Most of L is the **command**: the 11-word MRCmd.  To DDR, add tens more"),
-                "Compute takes each sample **as it arrives**: it hides under the read",
-                "After the last sample: **42** cycles to finish the counts, **25** to write "
-                "them, **20** to respond"],
+                f"The read: **L = {m['first']}**, then a sample a cycle (plus one per "
+                "16-word burst)",
+                ("-", f"{m['rc']} of those cycles are the 11-word `MRCmd`.  To DDR, add tens "
+                      "more"),
+                "The binning hides **under the read**",
+                f"After the last sample: **{tail_cnt}** cycles to send the `MWCmd` and the "
+                f"counts, **{tail_wr}** more to the last B, **{tail_rsp}** to respond"],
                 h=3.4, sz=15, sub=13),
-            *gantt(ids, rows, m["resp"] + 4, [0, m["L"], m["last"], m["resp"]]),
+            *gantt(ids, rows, m["resp"] + 4, [0, m["first"], m["last"], m["resp"]]),
             label(ids, 5.9, 4.6, 6.65, 0.5,
-                  "n = 256: **380** cycles.  n = 700: 852.  n = 1024: 1196.", sz=13, color=TEXT),
-            band(ids, "Job ≈ L + n·17/16 + 87.  Only the read grows with n; the compute costs "
-                      "nothing, hidden under it.", y=5.3, h=0.6, sz=16),
-            label(ids, L, 6.2, W, 0.32, HIST_MEASURED, sz=11),
+                  "  ".join(f"n = {n}: **{c}**." for n, c in HM_N.items()), sz=13, color=TEXT),
+            band(ids, f"Job ≈ L + n·17/16 + {HM_FIXED}.  Only the read grows with n; the rest "
+                      "is a fixed tail.", y=5.3, h=0.6, sz=16),
+            _measured_note(ids),
             sldnum_ph(ids)]
 
 
-def s_hist_overlap(ids):
-    return [title_ph(ids, "Back to Back, Jobs Overlap"),
-            lo.pic(ids, "hist_timeline_stream", L, 1.65, 7.0, 4.2, align="l"),
-            textbox(ids, 8.0, 1.75, 4.55, 3.9, [
-                kit.bullet("Five jobs, every command sent at once.  Top: the run; bottom: job 1",
-                           sz=14, spcBef=0),
-                kit.bullet("Job 2's read starts at **324**, while job 1 is still finishing its "
-                           "counts (341), writing them (366) and responding (386)", sz=14),
-                kit.bullet("The **read port** is the bottleneck: idle only 25 cycles between "
-                           "jobs, while the mover takes its next command", sz=14),
-                kit.bullet("All five: **3,379** cycles, against 3,667 one at a time", sz=14)]),
-            band(ids, "Free-running tasks overlap jobs **with no extra code**.  Unit 10 makes "
-                      "that overlap the design goal.", y=5.95, h=0.55, sz=15),
+def _serial_rows(m, jobs=2):
+    """Read port, kernel and write port over back-to-back jobs, from one job's cycles."""
+    period = m["period"]
+    rp, kn, wp = [], [], []
+    for j in range(jobs):
+        t = j * period
+        rp += [(t + m["rc"], t + m["first"], "L", kit.AMBERTINT, AMBER),
+               (t + m["first"], t + m["last"], f"job {j + 1}", TEAL, WHITE)]
+        kn += [(t + m["bin0"], t + m["bin1"], f"job {j + 1}", VIOLET, WHITE),
+               (t + m["cnt0"], t + m["cnt1"], "", TEAL, WHITE),
+               (t + m["cnt1"], t + m["done"], "", "E6E6E6", MUTED)]
+        wp += [(t + m["aw"], t + m["b"], "", AMBER, WHITE)]
+    return [("read port", rp), ("kernel", kn), ("write port", wp)], jobs * period
+
+
+def s_hist_serial(ids):
+    m = HM
+    rows, tmax = _serial_rows(m)
+    idle = m["period"] + m["ar"] - m["last"]
+    out = [title_ph(ids, "Back to Back: One Job at a Time"),
+           *gantt(ids, rows, tmax + 4, [0, m["last"], m["period"], m["period"] + m["last"]],
+                  x=L, y=1.8, w=W, lab_w=1.4, row_h=0.5, gap=0.15),
+           textbox(ids, L, 4.1, W, 1.3, [
+               kit.bullet("The kernel reads job 2's command only after job 1's response", sz=15,
+                          spcBef=0),
+               kit.bullet(f"So the read port sits idle **{idle}** cycles per job: while job 1's "
+                          "counts are written and acknowledged", sz=15),
+               kit.bullet(f"{B2B['jobs']} jobs back to back: **{B2B['total']:,}** cycles, against "
+                          f"{B2B['isolated']:,} one at a time.  Nothing overlaps", sz=15)]),
+           band(ids, "**Unit 10**: give the read, the compute and the write their **own tasks**, "
+                     "so job 2's read overlaps job 1's write.", y=5.5, h=0.6, sz=15),
+           _measured_note(ids, "  Two jobs of n = 256."),
+           sldnum_ph(ids)]
+    return out
+
+
+def s_hist_measured(ids):
+    return [title_ph(ids, "Measured: Three Jobs Back to Back"),
+            lo.pic(ids, "hist_timeline_simple", L, 1.6, 6.6, 4.37, align="l"),
+            textbox(ids, 7.55, 1.75, 5.0, 4.3, [
+                kit.bullet("hist_simple under XSI: jobs of n = 256, 1024 and 700.  One row per "
+                           "task or channel, one colour per job", sz=14, spcBef=0),
+                kit.bullet("Top: `t_rd` is **idle between jobs**, while `t_comp` sends the counts "
+                           "and waits (hatched)", sz=14),
+                kit.bullet("Zoom: job 1's last B at 380, its `MemComplete` read at 396, its "
+                           "response at 398", sz=14),
+                kit.bullet("Only then is job 2's command taken (402), and its read starts at "
+                           "**424**", sz=14)]),
+            label(ids, L, 6.1, W, 0.32, "demos/histogram: python hist_build.py --design simple.  "
+                  "Cycles from the end of reset.", sz=11),
+            sldnum_ph(ids)]
+
+# A practice pair on the serial kernel, on round numbers stated in the problem.
+SP = dict(L=20, cnt=40, wr=30, rsp=10, jobs=10)
+SP_TAIL = SP["cnt"] + SP["wr"] + SP["rsp"]
+
+
+def _sp_job(n):
+    return SP["L"] + n + SP_TAIL
+
+
+def _sp_overlap(n, jobs):
+    """The next job's read starts when this job's last sample arrives."""
+    return (jobs - 1) * (SP["L"] + n) + _sp_job(n)
+
+
+def s_serial_practice(ids):
+    return [title_ph(ids, "Where the Time Goes"), pill(ids, "PRACTICE"),
+            textbox(ids, L, 1.75, W, 4.5, [
+                para(f"A kernel like the histogram's: the first sample arrives L = {SP['L']} "
+                     f"cycles after it sends its read command, then one a cycle.  After the last "
+                     f"sample it needs {SP['cnt']} cycles to send its results, the write's last "
+                     f"B comes {SP['wr']} cycles later, and the response {SP['rsp']} after that.  "
+                     "It reads the next command as soon as it has responded; ignore the time "
+                     "that takes.", sz=16, color=TEXT,
+                     spcAft=8),
+                part("(a)", f"How long do {SP['jobs']} jobs of n = 512 take, back to back?  "
+                            "And of n = 64?", 16),
+                part("(b)", "What fraction of that time does the read port move data, for each n?",
+                     16),
+                part("(c)", "Another task takes over everything after the last sample, so the "
+                            "kernel can send the next read command as soon as the last sample "
+                            "arrives.  Redo (a)", 16),
+                part("(d)", "Which jobs gain the most from (c), and why?", 16)]),
+            sldnum_ph(ids)]
+
+
+def s_serial_solution(ids):
+    j = SP["jobs"]
+    a512, a64 = j * _sp_job(512), j * _sp_job(64)
+    c512, c64 = _sp_overlap(512, j), _sp_overlap(64, j)
+    cmd = (TEAL, WHITE)
+    lat = (kit.AMBERTINT, AMBER)
+    tail = ("F4F4F4", MUTED)
+    n, jobs = 64, 3
+    ser, ovl = [], []
+    for k in range(jobs):
+        t = k * _sp_job(n)
+        ser += [(t, t + SP["L"], "L", *lat), (t + SP["L"], t + SP["L"] + n, "", *cmd),
+                (t + SP["L"] + n, t + _sp_job(n), "tail", *tail)]
+        u = k * (SP["L"] + n)
+        ovl += [(u, u + SP["L"], "L", *lat), (u + SP["L"], u + SP["L"] + n, "", *cmd)]
+    u = (jobs - 1) * (SP["L"] + n)
+    ovl.append((u + SP["L"] + n, u + _sp_job(n), "tail", *tail))
+    tmax = jobs * _sp_job(n)
+    return [title_ph(ids, "Where the Time Goes"), pill(ids, "SOLUTION"),
+            textbox(ids, L, 1.75, W, 2.3, [
+                part("(a)", f"A job is L + n + {SP_TAIL}.  n = 512: {j} × {_sp_job(512)} = "
+                            f"!!{a512:,}!!.  n = 64: {j} × {_sp_job(64)} = !!{a64:,}!!", 15,
+                     spcBef=0),
+                part("(b)", f"n / (L + n + {SP_TAIL}): **{512 / _sp_job(512):.0%}** for n = 512, "
+                            f"only **{64 / _sp_job(64):.0%}** for n = 64", 15),
+                part("(c)", f"A new read every L + n.  n = 512: !!{c512:,}!!  "
+                            f"({a512 / c512:.2f}×).  n = 64: !!{c64:,}!!  ({a64 / c64:.1f}×)", 15),
+                part("(d)", f"**Small** jobs: the fixed {SP_TAIL}-cycle tail is most of their "
+                            "time, and (c) hides it under the next read", 15)]),
+            *gantt(ids, [("serial", ser), ("(c)", ovl)], tmax + 4,
+                   [0, jobs * (SP["L"] + n) + SP_TAIL, tmax], x=L, y=3.85, w=W, lab_w=1.0,
+                   row_h=0.42, gap=0.12),
+            label(ids, L, 5.2, W, 0.3, f"Three jobs of n = {n}: the read port's activity.  "
+                  "Unit 10 builds (c).", sz=12),
             sldnum_ph(ids)]
 
 
@@ -1684,16 +1773,16 @@ def s_queues(ids):
 
 
 def s_hist_mm(ids):
-    """histogram_mm.v, demos/histogram: the slave adaptor around the stream kernel."""
+    """hist_mmqueue.v, demos/histogram: the slave adaptor around the stream kernel."""
     def box(x, y, w, h, lines, fill, line):
         paras = [para(lines[0], sz=12, color=TEXT, b=True, align="ctr")]
         paras += [para(t, sz=10, color=MUTED, align="ctr") for t in lines[1:]]
         return shape(ids, x, y, w, h, fill=fill, line=line, lw=1.25, prst="roundRect",
                      adj=15000, paras=paras)
 
-    out = [title_ph(ids, "histogram_mm: Only the Top Changes"),
+    out = [title_ph(ids, "hist_mmqueue: Only the Top Changes"),
            col(ids, L, 5.15, [
-               "`histogram_mm.v`: an RTL top around the **unchanged** stream kernel",
+               "`hist_mmqueue.v`: an RTL top around the **unchanged** stream kernel",
                "`axi_slave_front`: the only part that speaks AXI, one transaction at a time",
                "A **decoder**: address bit 12 picks one of two 4 KB views",
                "`qcmd`, a queue in, feeds `s_cmd`; `qresp`, a queue out, takes `s_done`",
@@ -1708,7 +1797,7 @@ def s_hist_mm(ids):
            box(10.2, 1.95, 2.3, 0.65, ["decoder", "address bit 12"], WHITE, SLATE),
            box(9.45, 3.0, 1.45, 0.75, ["qcmd", "queue in, 0x0000"], SLATETINT, SLATE),
            box(11.05, 3.0, 1.45, 0.75, ["qresp", "queue out, 0x1000"], SLATETINT, SLATE),
-           box(9.45, 4.2, 3.05, 0.75, ["histogram_stream", "the five tasks, unchanged"],
+           box(9.45, 4.2, 3.05, 0.75, ["hist_simple", "the three tasks, unchanged"],
                TINT, VIOLET),
            box(6.3, 4.2, 1.3, 0.75, ["DDR", "samples, counts"], TEALTINT, TEAL),
            arrow(ids, 7.6, 2.27, 7.95, 2.27, SLATE, lw=1.75),
@@ -1726,7 +1815,7 @@ def s_hist_mm(ids):
            label(ids, 6.3, 3.0, 1.6, 0.3, "irq_cmd, irq_resp", sz=10, color=AMBER),
            band(ids, "Same kernel, same tasks: only who sends the command changed.", y=5.45,
                 h=0.55, sz=16),
-           label(ids, L, 6.15, W, 0.32, "demos/histogram/histogram_mm.v.  Waveflow generates "
+           label(ids, L, 6.15, W, 0.32, f"{HIST_MM_PATH}.  Waveflow generates "
                  "this adaptor for its own kernels, not yet for an HLS kernel.", sz=11),
            sldnum_ph(ids)]
     return out
@@ -1762,7 +1851,7 @@ def s_mm_host(ids):
                 kit.bullet("Measured: a command costs the host **7 cycles** (one 6-beat "
                            "write); a response arrives **6** after the kernel sends it", sz=14),
                 kit.bullet("Nothing is polled: each threshold is written once", sz=14)]),
-            label(ids, L, 6.25, W, 0.3, "demos/histogram/tb_xsi_histogram_mm.cpp, simplified.  "
+            label(ids, L, 6.25, W, 0.3, f"{HIST_MM_TB_PATH}, simplified.  "
                   "The upper half of each 4 KB view is its control.", sz=11),
             sldnum_ph(ids)]
 
@@ -1801,12 +1890,11 @@ def s_jobs_queued(ids):
            col(ids, L, 6.0, [
                "The host need not wait for one job before sending the next",
                ("-", "Queue in holds as many **whole commands** as fit"),
-               "Measured, five jobs: every command is in by cycle **53**",
-               ("-", "The kernel takes them at 17, 47, 77, 405 and 1517: jobs 4 and 5 wait "
+               f"Measured, five jobs: every command is in by cycle **{MMQ['all_in']}**",
+               ("-", "The kernel takes them at " + MMQ["taken"] + ": the later jobs wait "
                      "**in the queue**"),
                "Each response carries its `job_id`, and the host matches it to its job",
-               ("-", "The tag idea again, end to end"),
-               "The jobs overlap inside the kernel, as in section 3"],
+               "Inside the kernel the jobs still run **one at a time**, as in section 3"],
                h=4.0, sz=16, sub=14)]
     # a queue with stacked commands
     qx, qy, cw, ch = 8.2, 1.9, 2.4, 0.42
@@ -1819,7 +1907,7 @@ def s_jobs_queued(ids):
                          paras=[para(txt, sz=12, color=col_, b=True, align="ctr")]))
     out += [arrow(ids, qx + cw / 2, qy + 4 * (ch + 0.06) - 0.02, qx + cw / 2, 4.35, VIOLET,
                   lw=1.75),
-            label(ids, qx, 4.38, cw, 0.3, "to t_ctrl", sz=12, color=TEXT, align="ctr"),
+            label(ids, qx, 4.38, cw, 0.3, "to the kernel", sz=12, color=TEXT, align="ctr"),
             arrow(ids, 11.75, 2.11, qx + cw + 0.08, 2.11, SLATE, lw=1.75),
             label(ids, 10.75, 2.2, 1.8, 0.3, "the host pushes", sz=12, color=TEXT,
                   align="ctr"),
@@ -1864,7 +1952,7 @@ def s_bus_backpressure(ids):
 def s_queue_practice(ids):
     return [title_ph(ids, "Queuing Jobs"), pill(ids, "PRACTICE"),
             textbox(ids, L, 1.8, W, 4.4, [
-                para("`histogram_mm`'s queue in holds 512 words and its queue out 128.  A "
+                para("`hist_mmqueue`'s queue in holds 512 words and its queue out 128.  A "
                      "command is 5 words, a response 2; a packet goes in only whole.  The "
                      "interconnect is a crossbar.", sz=16, color=TEXT, spcAft=8),
                 part("(a)", "How many commands can be waiting in queue in?", 16),
@@ -1880,10 +1968,9 @@ def s_queue_solution(ids):
             textbox(ids, L, 1.8, 7.0, 4.4, [
                 part("(a)", "512 / 5: !!102 commands!! (510 words)", 15, spcBef=0),
                 part("(b)", "Queue out fills after **64** responses, and the kernel blocks on "
-                            "the 65th.  It has taken about 65 commands (a few more if `t_ctrl` "
-                            "runs ahead); 102 more wait in queue in.  The host's write of command "
-                            "!!≈ 168!! stalls the bus, so it never reaches its reads: a "
-                            "**deadlock**", 15),
+                            "the 65th.  It has taken 65 commands; 102 more wait in queue in.  "
+                            "The host's write of command !!168!! stalls the bus, so it never "
+                            "reaches its reads: a **deadlock**", 15),
                 part("(c)", "Wait on queue in's **room** interrupt before each push; and read "
                             "responses as they come (or keep at most 64 jobs outstanding, what "
                             "queue out can hold)", 15)]),
@@ -1936,10 +2023,11 @@ PLAN = [
     # section 3: concurrent tasks, on the histogram
     ("new", s_outline(2)),
     ("new", s_concurrent), ("new", s_hls_task),
-    ("new", s_top_mapped), ("new", s_task_streams), ("new", s_tags),
-    ("new", s_hist_ctrl), ("new", s_hist_compute), ("new", s_hist_resp),
+    ("new", s_top_mapped), ("new", s_task_streams),
+    ("new", s_hist_kernel_load), ("new", s_hist_kernel_store),
     ("new", s_job_tasks),
-    ("new", s_burst_timing), ("new", s_hist_timing), ("new", s_hist_overlap),
+    ("new", s_burst_timing), ("new", s_hist_timing), ("new", s_hist_serial),
+    ("new", s_hist_measured), ("new", s_serial_practice), ("new", s_serial_solution),
     # section 4: AXI4 under the hood
     ("new", s_outline(3)),
     ("old", 28, None), ("old", 29, None), ("old", 32, None), ("old", 33, None),
@@ -2000,6 +2088,11 @@ def main():
 
     if build.exists():
         shutil.rmtree(build)
+    if args.src is None:
+        args.work.mkdir(parents=True, exist_ok=True)
+        args.src = args.work / "sharedmem_v1.pptx"
+        args.src.write_bytes(subprocess.run(["git", "show", f"{V1_COMMIT}:{V1_PATH}"], cwd=ROOT,
+                                            check=True, capture_output=True).stdout)
     zipfile.ZipFile(args.src).extractall(build)
 
     order = kit.slide_order()
