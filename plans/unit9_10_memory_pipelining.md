@@ -101,23 +101,40 @@ Section 2, transactions and the data mover:
    word it asked for), and draw the activity of a two-read kernel (previews
    outstanding requests).
 
-Section 3, concurrent tasks on the histogram:
+Section 3, concurrent tasks on the histogram (reworked 2026-11-18 onto
+`hist_simple`):
 
 1. Concurrent tasks, `hls::task`, the histogram's top colour-mapped against its
-   diagram, the rules for streams between tasks, tags.
-2. The control, compute and response tasks' code; one job, task by task.
+   diagram (one kernel task between the two adaptors), the rules for streams
+   between tasks.
+2. The kernel's code in two halves: command, read and bin; then write, **wait
+   for the write's completion**, respond. One job, task by task.
 3. Timing: a burst, then a histogram job (compute overlaps the read; the
-   counts wait for the last sample).
+   counts wait for the last sample), then jobs back to back: **one at a time**,
+   the read port idle while each job's counts are written. A practice pair,
+   "Where the time goes", computes that idle time and what overlapping jobs
+   would save. This is unit 10's motivation.
+
+**Decision (2026-11-18): unit 9's histogram is `hist_simple`.** Three tasks:
+the read adaptor, one kernel task, the write adaptor. The kernel runs a whole
+job in order (command, read, bin, write, wait, respond), so there are no tags,
+no job descriptors and no overlap between jobs: unit 9 teaches the transaction
+mechanics, and unit 10 starts from its serial timeline. `xfer_len = 0`
+throughout unit 9; the tag is introduced in unit 10. The five-task version
+(control, compute and response tasks, tags in `xfer_msg`, jobs overlapping) and
+its slides are kept at the git tag `unit9-hist-multitask`; the descriptor
+version (framed movers, one `HistDesc` per job) lives on as
+`demos/histogram` `hist_pipeline`, a unit 10 reference. Unit 9's homework
+focuses on transaction mechanics, transaction-level interfaces and timing
+transactions.
 
 The y = a·x + b practice pairs were dropped as duplicates of `maxmem` and the
 two-reads problem.
 
-The histogram's code and formats are final, from `demos/histogram` (branch
-`demo/histogram`). Its measured timing is not: the timing slides use
-illustrative numbers, and the write transaction and response task carry a draft
-note until Waveflow's write adaptor sends its completion after the memory's
-acknowledgement. `histogram_mm` (section 5) is the same kernel with the command
-and response in memory-mapped queues, in the same directory.
+`demos/histogram` holds three designs: `hist_simple` (sections 2–3),
+`hist_mmqueue` (section 5: the same kernel with the command and response in
+memory-mapped queues) and `hist_pipeline` (unit 10). The slides take their
+code and measured numbers from the first two.
 
 Notes:
 
@@ -202,8 +219,9 @@ and the AXI signal slides of section 3; sections 2 and 4 are the new material.
 ### Progression
 
 1. Memory is slow and shared: latency vs. bandwidth, bursts (recap of unit 9).
-2. The naive version: compute reads memory directly and stalls. Show it in the
-   waveform.
+2. The naive version: unit 9's `hist_simple` timeline, one job at a time, with
+   the read port idle while each job's results are written. Unit 10 opens on
+   it.
 3. Load → compute → store as separate tasks with local buffers.
 4. Ping-pong (double) buffering, so the stages overlap: task pipelining.
    Throughput = the slowest stage.
@@ -272,6 +290,19 @@ Choices to make:
    needs random access within a block: histogram, transpose, block reversal,
    sort.
 
+   **Leaning (2026-11-18): a 2-D rotation**, `y1 = x1·cos + x2·sin`,
+   `y2 = −x1·sin + x2·cos`, with x1, x2, y1, y2 in separate (planar) arrays and
+   cos and sin computed by the host and sent in the command. Reading x1 then x2
+   forces a block buffer for x1 and another for y2, and load and store are both
+   2n words, so overlapping jobs gains about 1.5× (3n serial against a 2n
+   period) -- far more than the histogram, whose store is only 32 words. The
+   obvious objection, "read x1 and x2 in alternating chunks", is tiling, and
+   belongs in the stage-balancing section rather than being avoided. The
+   alternative, if the motivation must be airtight, is a two-pass kernel
+   (normalise by max |x|) that cannot emit anything before it has read every
+   input. Unit 10 also introduces the tag (`xfer_msg`) and the transfer
+   message.
+
 ### Risks
 
 - **Deadlocks hang rather than fail.** A dropped token in a free-running design
@@ -315,7 +346,9 @@ port*.
       cosim is unreliable; without a C-sim check, XSI is the only debugging loop.
 - [ ] Decide where the histogram's response goes (slave queue out vs. a master
       write to host memory).
-- [ ] Build the histogram in the new style (unit 9 design example → unit 10 lab).
+- [x] Build the histogram in the new style: `hist_simple` and `hist_mmqueue`
+      for unit 9, `hist_pipeline` kept for unit 10 (2026-11-18).
+- [ ] Unit 10's example: the rotation kernel (see "The block kernel" above).
 - [ ] Rework `units/unit09_sharedmem/sharedmem.pptx`; create unit 10; renumber
       systolic arrays (`unit10_arrays`) to unit 11.
 - [ ] Possibly a Waveflow glossary page mapping its terms to industry terms
