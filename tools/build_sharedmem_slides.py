@@ -1094,6 +1094,50 @@ def s_hist_resp(ids):
             sldnum_ph(ids)]
 
 
+def s_job_tasks(ids):
+    """One job, task by task.  Illustrative cycles, the model of the timing slide:
+    L = 10, 256 samples, 32 counts; the write burst starts once its counts are
+    buffered (Vitis's default conservative m_axi mode)."""
+    cmd, data, comp = (SLATE, WHITE), (TEAL, WHITE), (VIOLET, WHITE)
+    lat, wait = (kit.AMBERTINT, AMBER), ("F4F4F4", MUTED)
+    n, L_, nb = 256, 10, 32
+    t_rd0 = 8                                   # the read command reaches the read adaptor
+    s0, s1 = t_rd0 + L_, t_rd0 + L_ + n         # samples arrive
+    c1 = s1 + 4                                 # the last sample binned
+    k1 = c1 + nb                                # the counts streamed out
+    w1 = k1 + nb                                # the write burst
+    b1 = w1 + L_                                # the write acknowledged
+    rows = [
+        ("t_ctrl  control", [(0, 5, "", *cmd), (5, 8, "", *cmd), (8, 9, "", *cmd),
+                             (9, 12, "", *cmd)]),
+        ("t_rd  read", [(t_rd0, s0, "L", *lat), (s0, s1, f"{n} samples out", *data)]),
+        ("t_comp  compute", [(9, s0, "", *wait), (s0 + 1, c1, "bins each sample as it arrives",
+                                                  *comp), (c1, k1, "", *data)]),
+        ("t_wr  write", [(12, c1, "has its command: waits for counts", *wait),
+                         (c1, k1, "", *data), (k1, w1, "", *data), (w1, b1, "", *lat)]),
+        ("t_resp  response", [(0, b1, "waits for the write's completion", *wait),
+                              (b1, b1 + 3, "", *cmd)]),
+    ]
+    tmax = b1 + 5
+    out = [title_ph(ids, "One Job, Task by Task"),
+           *gantt(ids, rows, tmax, [0, s0, c1, b1], x=L, y=1.75, w=W, lab_w=1.85,
+                  row_h=0.5, gap=0.13)]
+    lx = L
+    for name, fill in (("command or response", SLATE), ("samples or counts", TEAL),
+                       ("compute", VIOLET), ("memory latency", kit.AMBERTINT),
+                       ("waiting for input", "F4F4F4")):
+        out.append(shape(ids, lx, 5.22, 0.3, 0.22, fill=fill, line=kit.GRAYLINE, lw=0.5))
+        out.append(label(ids, lx + 0.38, 5.17, 2.0, 0.3, name, sz=12, color=TEXT))
+        lx += 2.35
+    out += [band(ids, "Each task works only when its input arrives.  Compute runs **under the "
+                      "read**; the writer and the responder wait their turn.", y=5.6, h=0.55,
+                 sz=15),
+            draft_note(ids, "illustrative cycles.  The demo's measured timeline will replace "
+                            "them."),
+            sldnum_ph(ids)]
+    return out
+
+
 H_L, H_N, H_D, H_NB = 10, 256, 4, 16
 
 
@@ -1277,6 +1321,7 @@ PLAN = [
     ("new", s_why_transactional), ("new", s_concurrent), ("new", s_hls_task),
     ("new", s_top_mapped), ("new", s_task_streams), ("new", s_read_adaptor), ("new", s_tags),
     ("new", s_hist_ctrl), ("new", s_hist_compute), ("new", s_hist_resp),
+    ("new", s_job_tasks),
     ("new", s_scale_practice), ("new", s_scale_solution),
     ("new", s_burst_timing), ("new", s_hist_timing),
     ("new", s_scale_timing_practice), ("new", s_scale_timing_solution),
