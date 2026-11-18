@@ -5,7 +5,7 @@
 /results/
 __pycache__/
 
-# One set per version (--top stream, --top mm): the Vitis projects and the XSI workspace.
+# One set per design (--design simple, mmqueue, pipeline): the Vitis projects and the XSI workspace.
 /proj_*/
 /csim_proj_*/
 /xsi_*/

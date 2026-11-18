@@ -1,11 +1,15 @@
 ---
 title: Messages and Serialization
 parent: "Histogram: Transactional Memory"
-nav_order: 4
+nav_order: 5
 has_children: false
 ---
 
 # Messages and Serialization
+
+This page goes with [`hist_pipeline`](pipeline.md), the unit 10 design, whose descriptor it
+uses as its example; the generated API is the same one [`hist_simple`](simple.md) uses for its
+messages.
 
 Every task in this kernel talks to the next in **messages**: a command, a descriptor, a memory
 command, a response. On the wire each one is a few 32-bit words. Somebody has to decide which
@@ -181,7 +185,7 @@ ways to send it along, and they answer different questions.
 ### A framed header: describes the job
 
 The header travels **ahead of the data**, on the same stream, and the mover passes it on
-without reading it. This is what this demo does: `fwd_bursts = 1` on each memory command, the
+without reading it. This is what `hist_pipeline` does: `fwd_bursts = 1` on each memory command, the
 descriptor right behind it.
 
 ```
@@ -202,8 +206,8 @@ job is done*.
 
 ### An `xfer_msg` tag: matches the completion to its job
 
-Waveflow's other pair of movers, `mem_r_stream_task` and `mem_w_stream_done_task` (which an
-earlier version of this demo used), take their command on its own stream, `MRCmd` / `MWCmd`,
+Waveflow's other pair of movers, `mem_r_stream_task` and `mem_w_stream_done_task` (the ones
+[`hist_simple`](simple.md) uses, with no tag: `xfer_len = 0`), take their command on its own stream, `MRCmd` / `MWCmd`,
 and carry a **tag**: up to eight 32-bit words, `xfer_msg`, which the write mover hands back,
 untouched, in its `MemComplete` once the write is done. The tag does not travel with the data.
 It comes back with the **completion**.
@@ -267,6 +271,6 @@ What that buys:
   no word count changes anywhere else.
 
 The cost is that a header sits in every FIFO in front of the data, and the FIFO must be deep
-enough to hold it. The [stream page](stream.md#do-consecutive-jobs-overlap) shows what
+enough to hold it. The [hist_pipeline page](pipeline.md#do-consecutive-jobs-overlap) shows what
 happens when it is not: the read mover cannot pass the next job's descriptor on, and the next
 job's read waits for the compute task.

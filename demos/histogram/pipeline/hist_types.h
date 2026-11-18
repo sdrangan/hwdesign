@@ -1,4 +1,4 @@
-// hist_types.h -- what every task of the histogram kernel shares, in both versions.
+// hist_types.h -- what every task of the pipelined histogram kernel shares.
 //
 // The messages come from generated headers (include/, by hist_build.py):
 //   HistCmd, HistDesc, HistResp   this kernel's command, job descriptor and response   (hist_schema.py)

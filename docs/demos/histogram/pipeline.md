@@ -1,20 +1,31 @@
 ---
-title: The Stream Version
+title: "hist_pipeline: Overlapping Jobs"
 parent: "Histogram: Transactional Memory"
-nav_order: 2
+nav_order: 3
 has_children: false
 ---
 
-# The Stream Version
+# hist_pipeline: Overlapping Jobs
 
-In this version the command arrives on an AXI4-Stream, `s_cmd`, and the response leaves on
-another, `s_done`. The samples and counts are in memory, reached through two AXI4 master
-ports: `m_rd` for reading and `m_wr` for writing.
+This is the **unit 10** reference design. It has the same ports as [`hist_simple`](simple.md),
+takes the same commands and passes the same checks, but it is built so that consecutive jobs
+overlap: the next job's samples are read while this job's counts are still being computed,
+written and acknowledged. The same five jobs back to back finish at cycle 3369, against 3699
+for `hist_simple`.
+
+To get there, the one compute task of `hist_simple` is split into five tasks in a line, on
+Waveflow's **framed** movers, and each job's parameters travel through all of them as one
+**descriptor** in front of the data. The tasks and the descriptor are on
+[their own page](pipeline_tasks.md); this page is the top and its timing.
+
+The command arrives on an AXI4-Stream, `s_cmd`, and the response leaves on another, `s_done`.
+The samples and counts are in memory, reached through two AXI4 master ports: `m_rd` for
+reading and `m_wr` for writing.
 
 ## The top
 
 ```cpp
-void histogram_stream(hls::stream<word_t>& s_cmd, const word_t* m_rd, word_t* m_wr,
+void hist_pipeline(hls::stream<word_t>& s_cmd, const word_t* m_rd, word_t* m_wr,
                       hls::stream<word_t>& s_done) {
 #pragma HLS INTERFACE axis port=s_cmd
 #pragma HLS INTERFACE m_axi port=m_rd offset=off bundle=gmem0 depth=65536
@@ -121,7 +132,7 @@ A refused job never touches memory: its read has length 0 and issues no bus requ
 write has length 0. Its descriptor still goes through every task, and its response comes 34
 cycles after its command.
 
-![Each job's phases, measured from the RTL](images/timeline_stream.png)
+![Each job's phases, measured from the RTL](images/timeline_pipeline.png)
 
 ## Do consecutive jobs overlap?
 
@@ -141,7 +152,13 @@ header.
 The **read port** is the bottleneck. It is busy from one job's first sample to its last, then
 idle for 21 cycles while the read mover takes its next command, relays its descriptor and
 issues the first request; the compute task follows it sample for sample. All five jobs finish
-at cycle 3369, against 3587 for the same jobs one at a time.
+at cycle 3369, against 3587 for the same jobs one at a time (each from its command's last word
+to its response).
+
+Compare [`hist_simple`](simple.md#no-overlap-across-jobs), which runs one job at a time: there
+the read port waits 125 cycles between jobs, from job 1's last sample to job 2's read request,
+while job 1's counts are written, acknowledged and answered. The same five jobs finish at cycle
+3699, and running them back to back saves 4 cycles over running them alone, against 244 here.
 
 ## The response and the write acknowledgement
 

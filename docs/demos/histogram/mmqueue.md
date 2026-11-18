@@ -1,21 +1,21 @@
 ---
-title: The Memory-Mapped Version
+title: "hist_mmqueue: Memory-Mapped Queues"
 parent: "Histogram: Transactional Memory"
-nav_order: 3
+nav_order: 2
 has_children: false
 ---
 
-# The Memory-Mapped Version
+# hist_mmqueue: Memory-Mapped Queues
 
-In the [stream version](stream.md) the commands arrive on an AXI4-Stream. Something has to
-drive that stream, and a processor cannot: it talks to a peripheral with bus reads and writes.
-In this version the host does exactly that. It **writes** each command into a queue at an
-address, and **reads** each response out of another queue. The kernel is the stream
-version's kernel, unchanged, synthesized from the same C++.
+In [`hist_simple`](simple.md) the commands arrive on an AXI4-Stream. Something has to drive
+that stream, and a processor cannot: it talks to a peripheral with bus reads and writes. In
+`hist_mmqueue` the host does exactly that. It **writes** each command into a queue at an
+address, and **reads** each response out of another queue. The kernel is `hist_simple`,
+unchanged, synthesized from the same C++. This is the second unit 9 design.
 
 ## The top
 
-The new part is the RTL top, `histogram_mm.v`. It puts Waveflow's **memory-mapped slave
+The new part is the RTL top, `mmqueue/hist_mmqueue.v`. It puts Waveflow's **memory-mapped slave
 adaptor** in front of the kernel:
 
 ```
@@ -39,16 +39,16 @@ host --AXI4--> axi_slave_front --> decoder --+--> mm_queue_in  (qcmd,  0x0000) -
 - **`mm_queue_out`** buffers the responses. Reading the empty queue returns an error rather
   than stalling the bus, so the host waits for `irq_resp`, high while at least the threshold
   is waiting.
-- **The kernel** is `histogram_stream`, instantiated as it is. Its two `m_axi` ports, the data
+- **The kernel** is `hist_simple`, instantiated as it is. Its two `m_axi` ports, the data
   movers', go straight out to memory.
 
 Waveflow generates this adaptor for kernels it builds itself, but not yet for an HLS kernel with
-its own memory ports. So `histogram_mm.v` assembles it by hand, following Waveflow's generated
+its own memory ports. So `hist_mmqueue.v` assembles it by hand, following Waveflow's generated
 one-front adaptor. The adaptor modules are Waveflow's, used as they are.
 
 ## The host
 
-At RTL the host is a C++ model on the top's AXI slave port, in `tb_xsi_histogram_mm.cpp`. It is
+At RTL the host is a C++ model on the top's AXI slave port, in `tb_xsi_hist_mmqueue.cpp`. It is
 written as two threads that block, on Waveflow's host runtime (`xsi_sw.h`):
 
 ```cpp
@@ -67,14 +67,14 @@ which job a response belongs to only by reading its `job_id`.
 
 ## How it is checked
 
-The same five jobs as the stream version, run twice under XSI: with every command queued at
+The same five jobs as `hist_simple`, run twice under XSI: with every command queued at
 once, and with each job alone. Each time, every count is checked against NumPy's `bincount`
 and the refused job's counts must be untouched. Each response is **matched to its job by
 `job_id`**, not by position: every job must get exactly one response, with the right status.
 Both runs pass.
 
-There is no C simulation of this version. Its kernel is the stream version's, which has one,
-and the adaptor is RTL.
+There is no C simulation of this design. Its kernel is `hist_simple`'s, which has one, and the
+adaptor is RTL.
 
 ## The timing, seen from the host
 
@@ -82,24 +82,26 @@ With every command queued at once, in absolute clock cycles (100 MHz):
 
 | Job | Host writes the command | Kernel takes it (last word) | Kernel sends the response | Host has read it |
 | --- | --- | --- | --- | --- |
-| 1 (n = 256) | 10 to 17 | 17 | 379 | 385 |
-| 2 (n = 1024) | 19 to 26 | 26 | 1487 | 1493 |
-| 3 (n = 700) | 28 to 35 | 35 | 2251 | 2257 |
-| 4 (refused) | 37 to 44 | 311 | 2278 | 2284 |
-| 5 (n = 1024) | 46 to 53 | 1419 | 3380 | 3386 |
+| 1 (n = 256) | 10 to 17 | 17 | 409 | 415 |
+| 2 (n = 1024) | 19 to 26 | 413 | 1621 | 1627 |
+| 3 (n = 700) | 28 to 35 | 1625 | 2489 | 2495 |
+| 4 (refused) | 37 to 44 | 2493 | 2497 | 2503 |
+| 5 (n = 1024) | 46 to 53 | 2501 | 3710 | 3716 |
 
-- **All five commands are in by cycle 53.** Each is one 6-beat burst (the length word, then the 5
-  command words), 7 cycles with its write response. The kernel takes job 2's and job 3's
-  commands as soon as they arrive, because its control task frames each one into the 16-word
-  FIFO in front of the read mover and is free again. Jobs 4 and 5 wait **in the queue**, for 267
-  and 1366 cycles, until the kernel has room.
-- **The kernel runs exactly as in the stream version.** Its phases match the stream version's
-  cycle for cycle, 11 cycles later: L = 16, last count 328, response 362 after the command.
+- **All five commands are in by cycle 53.** Each is one 6-beat burst (the length word, then the
+  5 command words), 7 cycles with its write response. Then the host has nothing to do but wait
+  for responses.
+- **The commands wait in the queue, not in the kernel.** The kernel takes a command only when
+  its compute task has finished the job before: job 2's command is taken at 413, 4 cycles after
+  job 1's response; job 5's at 2501. `qcmd` holds 64 words, so it takes all five 5-word
+  commands at once.
+- **The kernel runs exactly as `hist_simple` does.** Its phases match the stream testbench's
+  cycle for cycle, 11 cycles later: L = 23, last B 374 and response 392 after the command.
 - **The host has a response 6 cycles after the kernel sends it**: `irq_resp` rises, then a 2-beat
   read.
 - **Nothing is polled.** The host writes each threshold once, at cycles 3 and 6, and otherwise
   only moves commands and responses.
 
 With each job alone, a job costs the host 7 cycles to send and 6 to collect, on top of the
-kernel's own time. For `n` = 256: 375 cycles from the start of the command's write to the
-response read, against 362 from command to response in the stream version.
+kernel's own time. For `n` = 256: 405 cycles from the start of the command's write to the end
+of the response read (cycles 10 to 415), against 392 from command to response in `hist_simple`.

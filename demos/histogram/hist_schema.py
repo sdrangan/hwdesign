@@ -8,9 +8,11 @@ into 32-bit words.  The Python side
 packs the commands and unpacks the responses with the same schemas, so the
 kernel, the testbenches and the golden model cannot disagree about the bits.
 
-Both versions of the kernel use these messages unchanged.  ``histogram_stream``
-receives a ``HistCmd`` on an AXI4-Stream and sends a ``HistResp`` on another;
-``histogram_mm`` will read and write the same words from queues in memory.
+Every design uses ``HistCmd`` and ``HistResp`` unchanged: ``hist_simple`` and
+``hist_pipeline`` receive a ``HistCmd`` on an AXI4-Stream and send a
+``HistResp`` on another; ``hist_mmqueue`` moves the same words through queues
+a host reaches over the bus.  ``HistDesc`` is ``hist_pipeline``'s alone: the
+descriptor it carries through its tasks.
 
 Every address in a command is a **word offset**, not a byte address: the
 memory adaptors take word offsets (``MemRCmd.addr``, ``MemWCmd.addr``), and the
@@ -58,7 +60,8 @@ class HistCmd(DataList):
 
 
 class HistDesc(DataList):
-    """The job descriptor: built once by the control task, then carried through the kernel.
+    """hist_pipeline only.  The job descriptor: built once by the control task, then carried
+    through the kernel.
 
     It travels as a framed header ahead of the samples (the read mover relays it), then ahead of
     the counts (the write mover buffers it across the write), and comes back on the write mover's

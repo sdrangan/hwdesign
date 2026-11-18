@@ -1,6 +1,6 @@
-// tb_xsi_histogram_mm.cpp -- the RTL testbench for histogram_mm, run through XSI.
+// tb_xsi_hist_mmqueue.cpp -- the RTL testbench for hist_mmqueue, run through XSI.
 //
-// histogram_mm.v puts Waveflow's memory-mapped slave adaptor in front of the stream kernel, so
+// hist_mmqueue.v puts Waveflow's memory-mapped slave adaptor in front of the hist_simple kernel, so
 // the testbench plays a HOST on its AXI4 slave port, s_axi, instead of driving streams:
 //
 //   HistHost    a software host (Waveflow's xsi_sw.h: threads that block, run as fibers), two
@@ -27,12 +27,12 @@
 using namespace wfbfm;
 
 #ifdef _WIN32
-static const char* const DESIGN_DLL = "xsim.dir/histogram_mm/xsimk.dll";
+static const char* const DESIGN_DLL = "xsim.dir/hist_mmqueue/xsimk.dll";
 #else
-static const char* const DESIGN_DLL = "xsim.dir/histogram_mm/xsimk.so";
+static const char* const DESIGN_DLL = "xsim.dir/hist_mmqueue/xsimk.so";
 #endif
 
-// The two views, as histogram_mm.v places them: 4 KB windows, 32-bit words, QDEPTH words each.
+// The two views, as hist_mmqueue.v places them: 4 KB windows, 32-bit words, QDEPTH words each.
 static const uint32_t QDEPTH = 64;
 static const MmView QCMD  = {"qcmd",  MmKind::QueueIn,  0x0000, 4096, 4, QDEPTH, 0, 0, 0};
 static const MmView QRESP = {"qresp", MmKind::QueueOut, 0x1000, 4096, 4, QDEPTH, 0, 0, 0};
@@ -95,7 +95,7 @@ int main() {
     const long n_cycles = run_param("n_cycles", 20000);
     const long drain = 50;
 
-    XsiSim sim(DESIGN_DLL, "histogram_mm.wdb");
+    XsiSim sim(DESIGN_DLL, "hist_mmqueue.wdb");
     FlatMemory mem(mem_words, 4);
     AxiMmReadSlave m_rd(sim.dut(), "m_axi_gmem0", mem);
     AxiMmWriteSlave m_wr(sim.dut(), "m_axi_gmem1", mem);

@@ -1,7 +1,7 @@
 """The test jobs, the memory they run in, and the NumPy golden they are checked against.
 
-Both versions of the kernel run the same jobs over the same memory image; only how the
-commands and responses travel differs.  The memory is one array of 32-bit words: the
+Every design runs the same jobs over the same memory image and is checked
+against the same golden.  The memory is one array of 32-bit words: the
 samples of every job, then a block of NBINS counts per job, pre-filled with a sentinel so a
 count the kernel never wrote is caught, not read as zero.
 

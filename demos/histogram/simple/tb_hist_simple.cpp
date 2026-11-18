@@ -1,6 +1,6 @@
-// tb_histogram_stream.cpp -- the C simulation testbench for histogram_stream.
+// tb_hist_simple.cpp -- the C simulation testbench for hist_simple.
 //
-//   tb_histogram_stream <in_dir> <out_dir>
+//   tb_hist_simple <in_dir> <out_dir>
 //
 // Reads <in_dir>/mem_in.bin (the memory image) and <in_dir>/cmds.bin (every job's HistCmd
 // words), written by hist_golden.py.  Pushes all the commands, calls the kernel once -- its
@@ -10,10 +10,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "hist_types.h"
-
-void histogram_stream(hls::stream<word_t>& s_cmd, const word_t* m_rd, word_t* m_wr,
-                      hls::stream<word_t>& s_done);
+#include "hist_simple.h"
 
 static std::vector<uint32_t> read_raw(const std::string& path) {
     std::vector<uint32_t> v;
@@ -48,7 +45,7 @@ int main(int argc, char** argv) {
     std::vector<word_t> mem(mem_in.begin(), mem_in.end());
     hls::stream<word_t> s_cmd, s_done;
     for (uint32_t w : cmds) s_cmd.write(w);
-    histogram_stream(s_cmd, mem.data(), mem.data(), s_done);
+    hist_simple(s_cmd, mem.data(), mem.data(), s_done);
 
     std::vector<uint32_t> resp;
     for (int i = 0; i < njobs * resp_words; i++) resp.push_back((uint32_t)s_done.read());
