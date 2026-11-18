@@ -64,12 +64,6 @@
       testbench.</description>
   </item>
 
-  <item id="sharedmem-demo" title="Shared-memory accelerator in Vitis HLS">
-    <description>A Vitis HLS accelerator that takes commands and reads and
-      writes a shared-memory image over an AXI master port, addressed by word
-      offsets, with a C testbench and a notebook.</description>
-  </item>
-
   <!-- No slide cites it since unit 8's deck was rebuilt around the poly,
        fsum and fir demos, so it gets its unit here. -->
   <item id="vector_mult" title="Vector multiply with loop unrolling"
