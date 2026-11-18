@@ -1,4 +1,4 @@
-// tb_xsi_histogram_stream.cpp -- the RTL testbench for histogram_stream, run through XSI.
+// tb_xsi_hist_simple.cpp -- the RTL testbench for hist_simple, run through XSI.
 //
 // Drives the synthesized Verilog cycle by cycle with Waveflow's bus models (xsi_bfm.h):
 //   s_cmd         an AXI4-Stream master playing every job's HistCmd words, back to back
@@ -20,9 +20,9 @@
 using namespace wfbfm;
 
 #ifdef _WIN32
-static const char* const DESIGN_DLL = "xsim.dir/histogram_stream/xsimk.dll";
+static const char* const DESIGN_DLL = "xsim.dir/hist_simple/xsimk.dll";
 #else
-static const char* const DESIGN_DLL = "xsim.dir/histogram_stream/xsimk.so";
+static const char* const DESIGN_DLL = "xsim.dir/hist_simple/xsimk.so";
 #endif
 
 // Inputs no model drives: the unused half of each m_axi bundle and the response side-bands.
@@ -41,7 +41,7 @@ int main() {
     const long n_cycles = run_param("n_cycles", 20000);
     const long drain = 50;
 
-    XsiSim sim(DESIGN_DLL, "histogram_stream.wdb");
+    XsiSim sim(DESIGN_DLL, "hist_simple.wdb");
     FlatMemory mem(mem_words, 4);                       // 32-bit words
     AxisMaster s_cmd(sim.dut(), "s_cmd", {});
     AxiMmReadSlave m_rd(sim.dut(), "m_axi_gmem0", mem);

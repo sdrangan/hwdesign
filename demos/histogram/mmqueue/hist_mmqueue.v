@@ -1,6 +1,6 @@
-// histogram_mm.v -- the memory-mapped version of the histogram accelerator: the RTL top.
+// hist_mmqueue.v -- the unit 9 histogram behind memory-mapped queues: the RTL top.
 //
-// The kernel is the stream version's, unchanged: the synthesized histogram_stream, whose command
+// The kernel is hist_simple's, unchanged: the synthesized hist_simple (../simple), whose command
 // arrives on s_cmd and whose response leaves on s_done.  What changes is who is on the other end of
 // those two streams.  Here it is Waveflow's memory-mapped slave adaptor, so a host -- a processor on
 // an AXI bus -- sends commands and takes responses with ordinary bus writes and reads:
@@ -24,7 +24,7 @@
 // front, two 4 KB views selected by address bit 12, and the read response taken from the view
 // that accepted the read (the front keeps at most one read outstanding).
 `timescale 1ns/1ps
-module histogram_mm #(
+module hist_mmqueue #(
     parameter integer DW      = 32,     // the bus word: the kernel's MEM_DW
     parameter integer S_AW    = 32,     // the host bus's address width
     parameter integer QDEPTH  = 64      // words each queue holds (12 commands, 32 responses)
@@ -166,11 +166,11 @@ module histogram_mm #(
         .irq(irq_resp)
     );
 
-    // ---- the kernel: the stream version, unchanged ---------------------------------------
+    // ---- the kernel: hist_simple, unchanged ---------------------------------------------
     // Each m_axi bundle is used in one direction only, so the other direction's inputs are tied
     // idle and its outputs left open; the sidebands Vitis drives as constants (LOCK, CACHE,
     // PROT, QOS, REGION, USER) are left open too.
-    histogram_stream u_kernel (
+    hist_simple u_kernel (
         .ap_clk(ap_clk), .ap_rst_n(ap_rst_n),
         .s_cmd_TDATA(s_cmd_TDATA), .s_cmd_TVALID(s_cmd_TVALID), .s_cmd_TREADY(s_cmd_TREADY),
         .s_done_TDATA(s_done_TDATA), .s_done_TVALID(s_done_TVALID), .s_done_TREADY(s_done_TREADY),

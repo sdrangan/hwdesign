@@ -1,16 +1,16 @@
 ---
-title: The Tasks and Messages
+title: "hist_pipeline: Tasks and Descriptor"
 parent: "Histogram: Transactional Memory"
-nav_order: 1
+nav_order: 4
 has_children: false
 ---
 
-# The Tasks and Messages
+# hist_pipeline: Tasks and Descriptor
 
-Everything on this page is shared by every version of the kernel. A version differs only in
-how the command reaches the control task and how the response leaves the response task: on
-AXI4-Streams in the [stream version](stream.md), through queues a host reaches over the bus in
-the [memory-mapped version](mm.md).
+The task bodies of the unit 10 design, [`hist_pipeline`](pipeline.md), in
+`demos/histogram/pipeline/`. Where [`hist_simple`](simple.md) has one compute task that runs a
+job start to finish, `hist_pipeline` has a task per step, so each step can work on a different
+job.
 
 ## One descriptor per job
 
@@ -175,7 +175,7 @@ static void hist_response(hls::stream<word_t>& wr_done, hls::stream<word_t>& res
 The descriptor comes back from the write mover, and the response is made from it. It waits for
 the write mover, not for the compute task, because a job is done only when its counts are in
 memory: the write mover sends the descriptor back only after the memory acknowledges the last
-write (see the [stream page](stream.md#the-response-and-the-write-acknowledgement)).
+write (see the [hist_pipeline page](pipeline.md#the-response-and-the-write-acknowledgement)).
 
 ## The data movers
 

@@ -59,11 +59,14 @@ machine and submitted to Gradescope. Units 10 and 11 are still being revised.
     completions; free-running kernels built from `hls::task`s; AXI4 under the hood; and
     memory-mapped queues, so a host can send a kernel its jobs
   * Demo:  [Crossbar or shared bus](../demos/xbar/), area and throughput of AMD's interconnect
-  * Demo:  [Histogram](../demos/histogram/), a free-running kernel on Waveflow's data movers,
-    in a stream version and a memory-mapped version
+  * Demo:  [Histogram](../demos/histogram/), a free-running kernel on Waveflow's data movers:
+    [one job at a time](../demos/histogram/simple.md), and the same kernel
+    [behind memory-mapped queues](../demos/histogram/mmqueue.md)
 * Unit 10:  Task-Level Pipelining and Load-Compute-Store (in preparation)
   * Overlapping the load, compute and store phases that the stereo lab runs one after the
     other, with free-running tasks and the data movers of unit 9
+  * Demo (reference):  [Histogram, overlapped](../demos/histogram/pipeline.md), the unit 9
+    histogram with consecutive jobs overlapping, one descriptor per job
 * Unit 11:  Systolic Arrays (from Spring 2026, to be revised)
   * Lecture:  [[PDF]](https://github.com/sdrangan/hwdesign/tree/main/units/unit10_arrays/array.pdf) [[pptx]](https://github.com/sdrangan/hwdesign/tree/main/units/unit10_arrays/array.pptx)
 * [Design project](../projects/)

@@ -2,67 +2,56 @@
 
 A histogram accelerator: given `n` 32-bit samples in memory, count how many land in each of
 32 bins (`bin = min(x >> shift, 31)`) and write the 32 counts back to memory.  The compute is
-deliberately simple; the point is the **interfaces**.  The kernel is free-running
+deliberately simple; the point is the **interfaces**.  Every kernel is free-running
 (`ap_ctrl_none`), built from concurrent `hls::task`s, and reaches memory only through
-Waveflow's framed transactional adaptors: a task sends a command (`MemRCmd`, `MemWCmd`) and the
-adaptor moves the words.
-
-```
-s_cmd -> control -[MemRCmd|desc]-> mem_r_stream_framed -[desc|samples]-> compute
-                                       (m_rd)                               |
-                                                   [MemWCmd|desc|counts]   v
-s_done <- response <---desc--- mem_w_stream_framed_done <-------------------+
-                                       (m_wr)
-```
-
-**One descriptor per job.** The control task builds a `HistDesc` with everything the later tasks
-need, and frames it behind the read command. The read mover relays it ahead of the samples;
-the compute task reads it, frames the write command and the same descriptor ahead of the
-counts; the write mover holds it across the write and echoes it once the memory has
-acknowledged the last word; the response task turns it into the `HistResp`. There are no side
-streams. Every message is a generated struct, read and written with its generated methods.
+Waveflow's data movers: a task sends a command and the mover moves the words.
 
 The walkthrough is the docs page *Demos › Histogram: Transactional Memory*
 (`docs/demos/histogram/index.md`).
 
-## Two versions
+## Three designs
 
-The task bodies and the messages are shared.  A version is a top file and a testbench:
+| Design | Unit | Directory | What it is |
+| --- | --- | --- | --- |
+| `simple` | 9 | `simple/` | `hist_simple`: one compute task and the two plain movers (`mem_r_stream_task`, `mem_w_stream_done_task`).  One job at a time: read command, bin, write command and counts, wait for the `MemComplete`, respond. |
+| `mmqueue` | 9 | `mmqueue/` | `hist_mmqueue.v`: the `hist_simple` kernel, unchanged, behind Waveflow's memory-mapped slave adaptor: a host writes commands into a queue and reads responses out of one. |
+| `pipeline` | 10 (reference) | `pipeline/` | `hist_pipeline`: five tasks on the framed movers, one `HistDesc` descriptor per job, so consecutive jobs overlap. |
 
-| Version | Command and response | Top |
-| --- | --- | --- |
-| `stream` | on AXI4-Streams, `s_cmd` and `s_done` | `histogram_stream.cpp` (HLS) |
-| `mm` | in queues a host reaches over AXI: it writes commands, reads responses | `histogram_mm.v` (RTL) |
+```
+hist_simple:
+s_cmd -> +---------+ -MRCmd-> mem_r_stream (m_rd) -samples-+
+         |         | <-------------------------------------+
+         | compute |
+         |         | -MWCmd + counts-> mem_w_stream_done (m_wr) -+
+s_done <-+---------+ <-------------- MemComplete ----------------+
+```
 
-The `mm` version's kernel *is* the stream kernel, synthesized from the same C++: its top is RTL
-that puts Waveflow's memory-mapped slave adaptor (`axi_slave_front.v`, `mm_queue_in.v`,
-`mm_queue_out.v`, from `waveflow/build/rtl`, used as they are) in front of `s_cmd` and `s_done`.
-Waveflow does not yet generate that adaptor for an HLS kernel with its own `m_axi` ports, so
-`histogram_mm.v` is assembled by hand.
+All three share the command and response (`HistCmd`, `HistResp`), the test jobs, the golden
+and the timing analysis.  `hist_simple` and `hist_pipeline` have the same external ports
+(`s_cmd`, `s_done`, `m_axi_gmem0`, `m_axi_gmem1`).
 
 ## Files
 
 | File | What it is |
 | --- | --- |
-| `hist_types.h` | constants (`NBINS`, `MAX_N`), the framed word type, and the includes every task shares |
-| `hist_control.h` | the control task: a `HistCmd` in, `[MemRCmd \| HistDesc]` out |
-| `hist_compute.h` | the compute task: `[HistDesc \| samples]` in, `[MemWCmd \| HistDesc \| counts]` out |
-| `hist_response.h` | the response task: the echoed `HistDesc` in, a `HistResp` out |
-| `histogram_stream.cpp` | the stream version's top: five `hls::task`s and their FIFOs |
-| `tb_histogram_stream.cpp` | its C simulation testbench |
-| `tb_xsi_histogram_stream.cpp` | its RTL testbench, driven through XSI with Waveflow's bus models |
-| `histogram_mm.v` | the mm version's top: slave front, two queue views (`qcmd` 0x0000, `qresp` 0x1000), the kernel |
-| `tb_xsi_histogram_mm.cpp` | its RTL testbench: a two-thread host model (Waveflow's `xsi_sw.h`) on `s_axi` |
-| `hist_schema.py` | `HistCmd`, `HistDesc` and `HistResp`, as Waveflow data schemas |
+| `hist_schema.py` | `HistCmd`, `HistResp` and `hist_pipeline`'s `HistDesc`, as Waveflow data schemas |
 | `hist_golden.py` | the test jobs, the memory image, and the NumPy golden |
-| `hist_timing.py` | measures each job's phases from the RTL waveform, and draws them |
-| `run.tcl` | the Vitis HLS script: `csim` or `synth` of one version per invocation |
-| `hist_build.py` | the build: which tool runs when, and what is checked in between |
+| `hist_timing.py` | measures each job's events from the RTL waveform, and draws them |
+| `hist_build.py` | the build: `--design simple`, `mmqueue` or `pipeline` |
+| `run.tcl` | the Vitis HLS script: `csim` or `synth` of one design per invocation |
+| `simple/hist_simple.cpp` | `hist_simple`'s top and its compute task |
+| `simple/hist_simple.h` | its constants and message includes |
+| `simple/tb_hist_simple.cpp`, `simple/tb_xsi_hist_simple.cpp` | its C simulation and XSI testbenches |
+| `mmqueue/hist_mmqueue.v` | the RTL top: slave front, `qcmd` (0x0000) and `qresp` (0x1000), the `hist_simple` kernel |
+| `mmqueue/tb_xsi_hist_mmqueue.cpp` | its RTL testbench: a two-thread host model (Waveflow's `xsi_sw.h`) on `s_axi` |
+| `pipeline/hist_pipeline.cpp` | `hist_pipeline`'s top: five `hls::task`s |
+| `pipeline/hist_types.h`, `hist_control.h`, `hist_compute.h`, `hist_response.h` | its shared types and three task bodies |
+| `pipeline/tb_hist_pipeline.cpp`, `pipeline/tb_xsi_hist_pipeline.cpp` | its testbenches |
 
-`include/` is generated by the build: `hist_cmd.h`, `hist_desc.h` and `hist_resp.h` from
-`hist_schema.py`, `mem_r_cmd.h` and `mem_w_cmd.h` from Waveflow's schemas (all with the framed
-methods), and Waveflow's adaptor bodies (`mem_r_stream_framed_task.h`,
-`mem_w_stream_framed_done_task.h`, ...) copied verbatim, as Waveflow's own generator does.
+`include/` is generated by the build for all three designs: `hist_cmd.h`, `hist_desc.h` and
+`hist_resp.h` from `hist_schema.py`; the plain movers' `m_r_cmd.h`, `m_w_cmd.h`,
+`mem_complete.h` and the framed movers' `mem_r_cmd.h`, `mem_w_cmd.h` from Waveflow's
+schemas; and Waveflow's mover bodies, copied verbatim, as Waveflow's own generator does.
 
 ## Running it
 
@@ -70,26 +59,28 @@ In `hwdesign-venv`, with Vitis and Vivado 2025.1 installed:
 
 ```bash
 python hist_build.py --list-steps
-python hist_build.py --through verify_csim     # headers + C simulation: about 15 s
-python hist_build.py                           # + synthesis, RTL under XSI, timing: about 2 min
-python hist_build.py --top mm                  # the mm version: synthesis, RTL under XSI, timing
+python hist_build.py --through verify_csim     # hist_simple: headers + C simulation, ~45 s
+python hist_build.py                           # + synthesis, RTL under XSI, timing: ~2 min
+python hist_build.py --design mmqueue          # synthesis, RTL under XSI, timing
+python hist_build.py --design pipeline         # the unit 10 reference
 ```
 
-The mm build has no C simulation step (its kernel is the stream one) and adds
+`mmqueue` has no C simulation step (its kernel is `hist_simple`) and adds
 `timing_host_<scenario>.md` / `.json`: per job, the host's command write, when the kernel took
 the command and sent the response, and when the host's read of it finished.
 
-Each version builds into its own directories, so building one never touches the other's:
-`proj_<version>/` (synthesis), `csim_proj_<version>/` (C simulation), `xsi_<version>/` (the XSI
-workspace) and `results/<version>/`.  For `stream`, `results/stream/` holds:
+Each design builds into its own directories, so building one never touches another's:
+`proj_<design>/` (synthesis), `csim_proj_<design>/` (C simulation), `xsi_<design>/` (the XSI
+workspace) and `results/<design>/`, which holds:
 
 | File | What it is |
 | --- | --- |
 | `verify_csim.json`, `verify_xsi_*.json` | every count and every response checked against the golden |
 | `synth.json` | each loop's II and iteration latency, the resources, the estimated Fmax |
-| `timing_back_to_back.md` / `.json` | each job's phases with all five commands sent at once |
+| `timing_back_to_back.md` / `.json` | each job's events with all five commands sent at once |
 | `timing_isolated.md` / `.json` | the same jobs run one at a time, 1500 idle cycles apart |
-| `timeline.png` | the back-to-back run, phase by phase, with a zoom on the first job |
+| `timing_totals.json` | the back-to-back span against the isolated jobs' spans added up |
+| `timeline.png` | the back-to-back run, one row per task or channel, a colour per job |
 | `xsi/<scenario>/` | the RTL's memory, its responses with their cycles, and the waveform |
 
 ## What the build checks
@@ -98,35 +89,28 @@ Five jobs run back to back: `n` = 256, 1024, 700 (half its samples saturate the 
 70000 (refused: `n > MAX_N`, nothing read or written) and 1024 again.  After C simulation and
 after each RTL run, every count is compared with `np.bincount`, every count block of a refused
 job must still hold its sentinel, the samples must be untouched, and there must be exactly one
-response per job, with the right status: in order for `stream`, matched by `job_id` for `mm`.  A deadlock therefore shows up as missing
-responses, not as a pass.
+response per job, with the right status: in order for `simple` and `pipeline`, matched by
+`job_id` for `mmqueue`.  A deadlock therefore shows up as missing responses, not as a pass.
 
-## Measured (stream version, XSI, 100 MHz)
+## Measured (XSI, 100 MHz)
 
-Cycles after each command's last word, each job run alone:
+`hist_simple`, cycles after each command's last word, the same back to back and alone:
 
-| n | first sample (L) | last sample | last count | last write ack (B) | response |
-| --- | --- | --- | --- | --- | --- |
-| 256 | 16 | 286 | 328 | 353 | 362 |
-| 1024 | 16 | 1102 | 1144 | 1169 | 1178 |
-| 700 | 16 | 758 | 800 | 825 | 834 |
-| 70000 (refused) | - | - | - | - | 34 |
+| n | AR | first sample (L) | last sample | MWCmd issued | AW | last count | last B | MemComplete read | response |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 256 | 22 | 23 | 293 | 302 | 339 | 349 | 374 | 390 | 392 |
+| 1024 | 22 | 23 | 1109 | 1118 | 1155 | 1165 | 1190 | 1206 | 1208 |
+| 700 | 22 | 23 | 765 | 774 | 811 | 821 | 846 | 862 | 864 |
+| 70000 (refused) | - | - | - | - | - | - | - | - | 4 |
 
-The sample loop runs at II=1.  Back to back the jobs overlap: the next job's read starts
-while this one's counts are still being computed and written, and all five finish at cycle
-3369 (3587 one at a time).  That needs `rd_data` deep enough to hold a whole descriptor:
-at depth 2 the read mover could not relay the next job's descriptor, and the next read
-waited for the compute task.
+| | `hist_simple` | `hist_pipeline` |
+| --- | --- | --- |
+| back to back, last response | cycle 3699 | cycle 3369 |
+| back to back, first command word to last response word | 3698 | 3368 |
+| alone, each job's first command word to last response word, added up | 3702 | 3612 |
+| estimated Fmax | 137 MHz | 111 MHz |
 
-**The response leaves 9 cycles after the bus acknowledges the last count.**  Waveflow's
-`mem_w_stream_framed_done_task` fences its echo behind the last write response (`B`): 6
-cycles to the first echoed word, then the response task, which needs only the descriptor's
-first two words.
-
-## Measured (mm version, XSI, 100 MHz)
-
-The kernel's phases are the stream version's, cycle for cycle.  With all five commands queued at
-once, the host has written them all by cycle 53; the kernel takes them at cycles 17, 26, 35,
-311 and 1419, so jobs 4 and 5 wait in `qcmd`.  Each command costs the host one 6-beat write (7
-cycles), and each response reaches it 6 cycles after the kernel sends it (`irq_resp`, then a
-2-beat read).  Each response is matched to its job by `job_id`.
+Every data loop (`SAMPLES`, `COUNTS`, the movers' `A2S`, `S2A`) runs at II=1 in both.
+`hist_mmqueue`'s kernel runs exactly as `hist_simple`, 11 cycles later; the host has written
+all five commands by cycle 53, the kernel takes each only after answering the one before, and
+each response reaches the host 6 cycles after the kernel sends it.

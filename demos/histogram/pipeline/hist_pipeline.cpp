@@ -1,4 +1,6 @@
-// histogram_stream.cpp -- the histogram kernel with its command and response on AXI4-Streams.
+// hist_pipeline.cpp -- the unit 10 histogram: consecutive jobs overlap, one descriptor per job.
+// The command and response are on AXI4-Streams, as in hist_simple (../simple), which is the
+// unit 9 design: one job at a time, through the plain movers.
 //
 // Free-running (ap_ctrl_none): five hls::tasks, each re-fired by the runtime whenever its
 // input arrives, joined by FIFOs.  Memory is reached only through Waveflow's framed adaptors.
@@ -11,8 +13,7 @@
 //                                          (m_wr)
 //
 // No side streams: every task learns about its job from the descriptor in front of its data.
-// The task bodies are in hist_*.h and the adaptors in include/mem_*_framed*_task.h, so the
-// memory-mapped version (histogram_mm.v) wraps this top unchanged.
+// The task bodies are in hist_*.h and the adaptors in include/mem_*_framed*_task.h.
 #include "hist_types.h"
 #include "hist_control.h"
 #include "hist_compute.h"
@@ -21,7 +22,7 @@
 #include "mem_w_stream_framed_done_task.h"
 #include <hls_task.h>
 
-void histogram_stream(hls::stream<word_t>& s_cmd, const word_t* m_rd, word_t* m_wr,
+void hist_pipeline(hls::stream<word_t>& s_cmd, const word_t* m_rd, word_t* m_wr,
                       hls::stream<word_t>& s_done) {
 #pragma HLS INTERFACE axis port=s_cmd
 #pragma HLS INTERFACE m_axi port=m_rd offset=off bundle=gmem0 depth=65536
