@@ -53,7 +53,7 @@ machine and submitted to Gradescope. Units 10 and 11 are still being revised.
   * Demo:  [FIR: nested loops](../demos/fir/)
   * In-class exercise:  [Unrolling a dot product](../demos/loopopt/inclass_unroll.md)
   * Lab:  [Stereo depth](../labs/stereo/)
-* Unit 9:  Transactional Interfaces to Memory
+* Unit 9:  Kernels and Shared Memory
   * Lecture:  [[PDF]](https://github.com/sdrangan/hwdesign/tree/main/units/unit09_sharedmem/sharedmem.pdf) [[pptx]](https://github.com/sdrangan/hwdesign/tree/main/units/unit09_sharedmem/sharedmem.pptx)
   * Shared memory and interconnects; reaching memory through a data mover, with commands and
     completions; free-running kernels built from `hls::task`s; AXI4 under the hood; and

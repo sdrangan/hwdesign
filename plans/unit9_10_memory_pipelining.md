@@ -1,4 +1,4 @@
-# Units 9–10: transactional memory interfaces and task pipelining
+# Units 9–10: kernels and shared memory, and task pipelining
 
 ## Overview
 
@@ -14,7 +14,7 @@ units:
 
 | Unit | Topic | Question it answers |
 |---|---|---|
-| 9  | Transactional interfaces to memory | How does my kernel talk to memory and to the host? |
+| 9  | Kernels and shared memory | How does my kernel talk to memory and to the host? |
 | 10 | Task-level pipelining and LCS | How do I keep the compute busy while memory is slow? |
 | 11 | Systolic arrays (moved from unit 10) | — |
 
@@ -53,7 +53,7 @@ Why this order works:
 - **Any block-processing kernel will do** for unit 10. It does not have to be
   the interleaver.
 
-## Unit 9: Transactional interfaces to memory
+## Unit 9: Kernels and shared memory
 
 ### 1. Shared memory and interconnects
 
