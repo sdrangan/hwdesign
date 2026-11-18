@@ -1,18 +1,19 @@
-// hist_response.h -- the response task: one write completion in, one HistResp out.
+// hist_response.h -- the response task: the job's descriptor back from the write mover, one
+// HistResp out.
 //
-// The write adaptor sends its MemComplete only after the memory acknowledges the job's last
-// write (B), so the response means the counts are in memory.  The job id and status ride in
-// the cookie the control task put in the MWCmd; the adaptor echoes it without reading it.
+// The write mover echoes the descriptor only after the memory acknowledges the job's last
+// write (B), so the response means the counts are in memory.  The descriptor is the one the
+// control task built; the movers carried it without reading it.
 #ifndef HIST_RESPONSE_H
 #define HIST_RESPONSE_H
 #include "hist_types.h"
 
 static void hist_response(hls::stream<word_t>& wr_done, hls::stream<word_t>& resp_out) {
-    MemComplete done;
-    done.read_stream<MEM_DW>(wr_done);
+    HistDesc d;
+    d.read_stream<MEM_DW>(wr_done);
     HistResp resp;
-    resp.job_id = done.xfer_msg.data[XFER_JOB_ID];
-    resp.status = (HistStatus)(int)done.xfer_msg.data[XFER_STATUS];
+    resp.job_id = d.job_id;
+    resp.status = d.status;
     resp.write_stream<MEM_DW>(resp_out);
 }
 

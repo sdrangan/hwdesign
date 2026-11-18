@@ -7,7 +7,9 @@ job:
 
     cmd        the HistCmd's first and last word accepted on s_cmd
     read       the first AR request, the first R beat, and the last R beat
-    compute    the compute task's first sample read, and its last count written
+    compute    the compute task's descriptor read, its write command framed, its first sample
+               read, and its last count written (the descriptor and the write command are
+               counted off the same strobes, ahead of the samples and the counts)
     write      the first AW request, the last W beat, and the B response
     resp       the HistResp's first and last word on s_done
 
@@ -107,15 +109,22 @@ def _requests(cycles: np.ndarray, lens: np.ndarray, sizes: list[int]) -> list[np
 
 
 def job_table(trace: dict[str, np.ndarray], jobs, nbins: int, cmd_words: int,
-              resp_words: int) -> list[dict]:
-    """One row per job: the cycle each phase began and ended."""
+              resp_words: int, hdr_in: int = 0, hdr_out: int = 0) -> list[dict]:
+    """One row per job: the cycle each phase began and ended.
+
+    *hdr_in* / *hdr_out*: the header words on the compute task's streams ahead of each job's
+    samples (the descriptor) and ahead of its counts (the write command and the descriptor)."""
     b = beat_cycles(trace)
     nread = [j.n if j.ok else 0 for j in jobs]
     nwrite = [nbins if j.ok else 0 for j in jobs]
     cmd = _split(b["cmd"], [cmd_words] * len(jobs))
     resp = _split(b["resp"], [resp_words] * len(jobs))
     r, w = _split(b["r"], nread), _split(b["w"], nwrite)
-    cin, cout = _split(b["cmp_in"], nread), _split(b["cmp_out"], nwrite)
+    cin_all = _split(b["cmp_in"], [hdr_in + n for n in nread])
+    cout_all = _split(b["cmp_out"], [hdr_out + n for n in nwrite])
+    cin = [x[hdr_in:] for x in cin_all]                 # the samples
+    cout = [x[hdr_out:] for x in cout_all]              # the counts
+    hdr_first = [x[:hdr_out] for x in cout_all]         # the write command, framed by compute
     ar = _requests(b["ar"], trace["m_axi_gmem0_ARLEN"][b["ar"] - 1], nread)
     aw = _requests(b["aw"], trace["m_axi_gmem1_AWLEN"][b["aw"] - 1], nwrite)
     bresp = _split(b["b"], [len(x) for x in aw])
@@ -134,6 +143,8 @@ def job_table(trace: dict[str, np.ndarray], jobs, nbins: int, cmd_words: int,
             "rd_req": first(ar[k]), "rd_bursts": len(ar[k]),
             "rd_first": first(r[k]), "rd_last": last(r[k]),
             "cmp_first": first(cin[k]), "cmp_last": last(cout[k]),
+            "desc_in": last(cin_all[k][:hdr_in]) if hdr_in else None,
+            "wr_cmd_first": first(hdr_first[k]), "wr_cmd_last": last(hdr_first[k]),
             "wr_req": first(aw[k]), "wr_bursts": len(aw[k]),
             "wr_first": first(w[k]), "wr_last": last(w[k]), "wr_bresp": last(bresp[k]),
             "resp_first": first(resp[k]), "resp_last": last(resp[k]),
@@ -159,7 +170,8 @@ def format_table(rows: list[dict]) -> str:
 
 def format_relative(rows: list[dict]) -> str:
     """The same events, in cycles after the command's last word was accepted."""
-    cols = [("AR", "rd_req"), ("first sample (L)", "rd_first"), ("last sample", "rd_last"),
+    cols = [("AR", "rd_req"), ("desc in compute", "desc_in"), ("write cmd framed", "wr_cmd_last"),
+            ("first sample (L)", "rd_first"), ("last sample", "rd_last"),
             ("compute first", "cmp_first"), ("last count", "cmp_last"), ("AW", "wr_req"),
             ("last W", "wr_last"), ("last B", "wr_bresp"), ("response", "resp_last")]
     lines = ["| job | n | " + " | ".join(h for h, _ in cols) + " |", "|" + "---|" * (len(cols) + 2)]
@@ -252,7 +264,7 @@ def draw_timeline(rows: list[dict], png: Path, title: str) -> Path:
     for x, y, text, ha in notes:
         ax2.text(x, y - 0.35, text, fontsize=8.5, color="#333333", va="top", ha=ha)
     ax2.set_xlabel("clock cycle (100 MHz), from the end of reset")
-    ax2.set_title(f"zoom: job 1, and job 2's read starting as job 1's compute ends",
+    ax2.set_title(f"zoom: job 1, and job 2's read starting while job 1 still computes",
                   loc="left", fontsize=11)
     fig.tight_layout()
     png.parent.mkdir(parents=True, exist_ok=True)
@@ -262,13 +274,15 @@ def draw_timeline(rows: list[dict], png: Path, title: str) -> Path:
 
 
 def measure(vcd_path: Path, top: str, jobs, nbins: int, cmd_words: int, resp_words: int,
-            out_dir: Path, name: str, figure: bool, title: str | None = None) -> dict:
+            out_dir: Path, name: str, figure: bool, title: str | None = None,
+            hdr_in: int = 0, hdr_out: int = 0) -> dict:
     """timing_<name>.json and .md into *out_dir*; with *figure*, timeline.png too.
 
     *top* is the scope the kernel's signals are in: the top itself for the stream version, the
-    kernel instance (``histogram_mm.u_kernel``) for the mm version."""
+    kernel instance (``histogram_mm.u_kernel``) for the mm version.  *hdr_in* / *hdr_out*: see
+    :func:`job_table`."""
     trace = load_trace(vcd_path, top, sorted({s for v in BEATS.values() for s in v} | set(EXTRA)))
-    rows = job_table(trace, jobs, nbins, cmd_words, resp_words)
+    rows = job_table(trace, jobs, nbins, cmd_words, resp_words, hdr_in, hdr_out)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / f"timing_{name}.json").write_text(json.dumps(rows, indent=2) + "\n",
                                                  encoding="utf-8")

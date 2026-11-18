@@ -1,30 +1,31 @@
-// hist_control.h -- the control task: one command in, one command to each adaptor and a job
-// descriptor to compute.  It owns no memory port; it only turns a HistCmd into the three
-// messages that start a job.
+// hist_control.h -- the control task: one command in, one framed read request out.
+//
+// It builds the job's descriptor, HistDesc, with everything a later task needs, and frames it
+// behind the read command: [MemRCmd(fwd_bursts = 1) | HistDesc].  The read mover relays the
+// descriptor, unread, ahead of the samples it fetches.  The control task owns no memory port,
+// and it is the only task that sees the HistCmd.
 #ifndef HIST_CONTROL_H
 #define HIST_CONTROL_H
 #include "hist_types.h"
 
-static void hist_control(hls::stream<word_t>& cmd_in, hls::stream<word_t>& rd_cmd,
-                         hls::stream<HistJob>& job, hls::stream<word_t>& wr_cmd) {
+static void hist_control(hls::stream<word_t>& cmd_in, hls::stream<frame_t>& rd_cmd) {
     HistCmd cmd;
     cmd.read_stream<MEM_DW>(cmd_in);
     const bool ok = (cmd.n <= MAX_N);
 
-    if (ok) {                                   // read n samples from data_addr
-        MRCmd rc;
-        rc.addr = cmd.data_addr;  rc.len = cmd.n;  rc.xfer_len = 0;
-        rc.write_stream<MEM_DW>(rd_cmd);
-    }
-    HistJob j;                                  // a refused job reads 0 and emits nothing
-    j.n = ok ? (int)cmd.n : 0;  j.shift = cmd.shift;  j.emit = ok;
-    job.write(j);
+    HistDesc d;                                 // the job, as every later task needs it
+    d.job_id = cmd.job_id;
+    d.status = ok ? HistStatus::OK : HistStatus::N_TOO_LARGE;
+    d.n = ok ? (int)cmd.n : 0;                  // a refused job reads nothing
+    d.shift = cmd.shift;
+    d.cnt_addr = cmd.cnt_addr;
 
-    MWCmd wc;                                   // write NBINS counts to cnt_addr
-    wc.addr = cmd.cnt_addr;  wc.len = ok ? NBINS : 0;  wc.xfer_len = 2;
-    wc.xfer_msg.data[XFER_JOB_ID] = cmd.job_id;
-    wc.xfer_msg.data[XFER_STATUS] = (int)(ok ? HistStatus::OK : HistStatus::N_TOO_LARGE);
-    wc.write_stream<MEM_DW>(wr_cmd);
+    MemRCmd rc;                                 // read n samples from data_addr,
+    rc.addr = cmd.data_addr;                    // after relaying the one burst behind this
+    rc.len = d.n;
+    rc.fwd_bursts = 1;
+    rc.write_framed_stream<MEM_DW>(rd_cmd);
+    d.write_framed_stream<MEM_DW>(rd_cmd);      // that burst: the descriptor
 }
 
 #endif  // HIST_CONTROL_H

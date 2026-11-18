@@ -1,5 +1,10 @@
-// hist_compute.h -- the compute task: samples in, counts out.  Streams only: it never sees an
-// address, so it is the same task whichever way the samples reach it.
+// hist_compute.h -- the compute task: [descriptor | samples] in, [write command | descriptor |
+// counts] out.  Streams only: it never sees an address of its own, only the one the
+// descriptor carries for the write mover.
+//
+// It frames the write before it bins: the MemWCmd and the descriptor go out as soon as the
+// descriptor is read, so the write mover is waiting for the counts before the first sample
+// arrives, and the write command is not on the critical path.
 //
 // counts[] is partitioned into NBINS registers.  The increment is a read-modify-write, and a
 // sample landing in the same bin as the one before depends on it: the loop can start a sample
@@ -9,25 +14,35 @@
 #define HIST_COMPUTE_H
 #include "hist_types.h"
 
-static void hist_compute(hls::stream<HistJob>& job, hls::stream<word_t>& samples,
-                         hls::stream<word_t>& counts_out) {
+static void hist_compute(hls::stream<frame_t>& rd_data, hls::stream<frame_t>& wr_data) {
+    HistDesc d;
+    d.read_framed_stream<MEM_DW>(rd_data);      // the header the read mover relayed
+    const bool ok = (d.status == HistStatus::OK);
+
+    MemWCmd wc;                                 // write NBINS counts to cnt_addr, and
+    wc.addr = d.cnt_addr;                       // echo the one burst behind this when done
+    wc.len = ok ? NBINS : 0;
+    wc.fwd_bursts = 1;
+    wc.write_framed_stream<MEM_DW>(wr_data);
+    d.write_framed_stream<MEM_DW>(wr_data);     // that burst: the same descriptor, passed on
+
     count_t counts[NBINS];
 #pragma HLS ARRAY_PARTITION variable=counts complete
-    const HistJob j = job.read();
 CLEAR: for (int b = 0; b < NBINS; b++) {
 #pragma HLS UNROLL
         counts[b] = 0;
     }
-SAMPLES: for (int i = 0; i < (int)j.n; i++) {
+SAMPLES: for (int i = 0; i < (int)d.n; i++) {
 #pragma HLS PIPELINE II=1
-        const word_t x = samples.read();
-        const word_t bin = x >> j.shift;
+        bool last;
+        const word_t x = streamutils::read_boundary_word<frame_t, MEM_DW>(rd_data, last);
+        const word_t bin = x >> d.shift;
         counts[bin < NBINS ? (int)bin : NBINS - 1]++;
     }
-    if (j.emit) {
+    if (ok) {
     COUNTS: for (int b = 0; b < NBINS; b++) {
 #pragma HLS PIPELINE II=1
-            counts_out.write(counts[b]);
+            streamutils::write_boundary_word<frame_t, MEM_DW>(wr_data, counts[b], b == NBINS - 1);
         }
     }
 }

@@ -27,19 +27,25 @@ Instead a task sends a **memory command**, "read `len` words starting at word `a
 words back.
 
 ```
-s_cmd -> control --rd_cmd--> mem_r_stream --rd_data--> compute --wr_data--> mem_w_stream_done
-             |                   (m_rd)                    ^                  (m_wr)   |
-             +-------------------- job --------------------+                  wr_done |
-                                                                                       v
-                                                             s_done <- response <------+
+s_cmd -> control -[MemRCmd|desc]-> mem_r_stream_framed -[desc|samples]-> compute
+                                       (m_rd)                               |
+                                                   [MemWCmd|desc|counts]   v
+s_done <- response <---desc--- mem_w_stream_framed_done <-------------------+
+                                       (m_wr)
 ```
+
+The first task builds one **descriptor** per job (`desc`), with everything the later tasks
+need, and every task passes it on in front of its data. There are no side streams.
 
 ## Learning Objectives
 
 In going through this demo, you will:
 
-- Follow one job through the **command–response protocol**: a command in, memory commands
-  to the data movers, a response out once the job's results are written
+- Follow one job through the **command–response protocol**: a command in, a memory command
+  to each data mover, a response out once the job's results are written
+- Carry a job through the kernel as **one descriptor**, built once and passed on by every task
+- Define messages once in Python and use the **generated serialization** in C++, with no hand
+  packing
 - Write a **compute task** that sees only streams, never an address
 - See how the data movers take **word offsets** and turn them into AXI bursts
 - Keep a loop at **II=1** through a read-modify-write, by holding the counts in registers
@@ -49,12 +55,14 @@ In going through this demo, you will:
 
 ## The pages
 
-1. [The tasks and messages](tasks.md): the command and response, the memory commands, and
+1. [The tasks and messages](tasks.md): the descriptor, the streams between the tasks, and
    the body of each task. These are shared by every version of the kernel.
 2. [The stream version](stream.md): the top, with the command and response on AXI4-Streams;
    how it is built and checked; and the measured timing of each job.
 3. [The memory-mapped version](mm.md): the same kernel behind a memory-mapped slave adaptor,
    so a host queues commands and collects responses with bus writes and reads.
+4. [Messages and serialization](messages.md): how a message is declared in Python, what the
+   generator produces, and the two ways to carry information with a memory transfer.
 
 ## The code
 
@@ -69,7 +77,7 @@ Everything is in `hwdesign/demos/histogram`:
 | `tb_xsi_histogram_stream.cpp` | its RTL testbench, run through XSI |
 | `histogram_mm.v` | the memory-mapped version's top: the slave adaptor and the kernel, in RTL |
 | `tb_xsi_histogram_mm.cpp` | its RTL testbench: a host model on the AXI slave port |
-| `hist_schema.py` | the command and response, as Waveflow data schemas |
+| `hist_schema.py` | the command, the descriptor and the response, as Waveflow data schemas |
 | `hist_golden.py` | the test jobs and the NumPy golden |
 | `hist_timing.py` | the per-job timing, measured from the RTL waveform |
 | `hist_build.py` | the build script |
@@ -79,6 +87,6 @@ To run all of it, in `hwdesign-venv` with Vitis and Vivado installed:
 ```bash
 (env) cd demos/histogram
 (env) python hist_build.py --through verify_csim    # C simulation: about 15 seconds
-(env) python hist_build.py                          # synthesis, RTL and timing: about 75 seconds
-(env) python hist_build.py --top mm                 # the memory-mapped version: about 90 seconds
+(env) python hist_build.py                          # synthesis, RTL and timing: about 2 minutes
+(env) python hist_build.py --top mm                 # the memory-mapped version: about 2 minutes
 ```
