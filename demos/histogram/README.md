@@ -22,10 +22,16 @@ The walkthrough is the docs page *Demos › Histogram: Transactional Memory*
 
 The task bodies and the messages are shared.  A version is a top file and a testbench:
 
-| Version | Command and response | Top | Status |
-| --- | --- | --- | --- |
-| `stream` | on AXI4-Streams, `s_cmd` and `s_done` | `histogram_stream.cpp` | built |
-| `mm` | in queues in memory (unit 9, section 4) | `histogram_mm.cpp` | not yet |
+| Version | Command and response | Top |
+| --- | --- | --- |
+| `stream` | on AXI4-Streams, `s_cmd` and `s_done` | `histogram_stream.cpp` (HLS) |
+| `mm` | in queues a host reaches over AXI: it writes commands, reads responses | `histogram_mm.v` (RTL) |
+
+The `mm` version's kernel *is* the stream kernel, synthesized from the same C++: its top is RTL
+that puts Waveflow's memory-mapped slave adaptor (`axi_slave_front.v`, `mm_queue_in.v`,
+`mm_queue_out.v`, from `waveflow/build/rtl`, used as they are) in front of `s_cmd` and `s_done`.
+Waveflow does not yet generate that adaptor for an HLS kernel with its own `m_axi` ports, so
+`histogram_mm.v` is assembled by hand.
 
 ## Files
 
@@ -38,6 +44,8 @@ The task bodies and the messages are shared.  A version is a top file and a test
 | `histogram_stream.cpp` | the stream version's top: five `hls::task`s and their FIFOs |
 | `tb_histogram_stream.cpp` | its C simulation testbench |
 | `tb_xsi_histogram_stream.cpp` | its RTL testbench, driven through XSI with Waveflow's bus models |
+| `histogram_mm.v` | the mm version's top: slave front, two queue views (`qcmd` 0x0000, `qresp` 0x1000), the kernel |
+| `tb_xsi_histogram_mm.cpp` | its RTL testbench: a two-thread host model (Waveflow's `xsi_sw.h`) on `s_axi` |
 | `hist_schema.py` | `HistCmd` and `HistResp`, as Waveflow data schemas |
 | `hist_golden.py` | the test jobs, the memory image, and the NumPy golden |
 | `hist_timing.py` | measures each job's phases from the RTL waveform, and draws them |
@@ -56,8 +64,12 @@ In `hwdesign-venv`, with Vitis and Vivado 2025.1 installed:
 python hist_build.py --list-steps
 python hist_build.py --through verify_csim     # headers + C simulation: about 15 s
 python hist_build.py                           # + synthesis, RTL under XSI, timing: about 75 s
-python hist_build.py --top mm                  # says the mm version is not built yet
+python hist_build.py --top mm                  # the mm version: synthesis, RTL under XSI, timing
 ```
+
+The mm build has no C simulation step (its kernel is the stream one) and adds
+`timing_host_<scenario>.md` / `.json`: per job, the host's command write, when the kernel took
+the command and sent the response, and when the host's read of it finished.
 
 Each version builds into its own directories, so building one never touches the other's:
 `proj_<version>/` (synthesis), `csim_proj_<version>/` (C simulation), `xsi_<version>/` (the XSI
@@ -78,7 +90,7 @@ Five jobs run back to back: `n` = 256, 1024, 700 (half its samples saturate the 
 70000 (refused: `n > MAX_N`, nothing read or written) and 1024 again.  After C simulation and
 after each RTL run, every count is compared with `np.bincount`, every count block of a refused
 job must still hold its sentinel, the samples must be untouched, and there must be exactly one
-response per job, in order, with the right status.  A deadlock therefore shows up as missing
+response per job, with the right status: in order for `stream`, matched by `job_id` for `mm`.  A deadlock therefore shows up as missing
 responses, not as a pass.
 
 ## Measured (stream version, XSI, 100 MHz)
@@ -100,3 +112,11 @@ while this one's counts are still being computed and written.
 cycles for the fence, 12 for the 10-word `MemComplete` (8 words of it the cookie), 4 for the
 response task.  Requires the Waveflow write adaptor with the `hls::fence`; with the older
 adaptor the response left 5 cycles *before* `B`.
+
+## Measured (mm version, XSI, 100 MHz)
+
+The kernel's phases are the stream version's, cycle for cycle.  With all five commands queued at
+once, the host has written them all by cycle 53; the kernel takes them at cycles 17, 47, 77,
+405 and 1517, so jobs 4 and 5 wait in `qcmd`.  Each command costs the host one 6-beat write (7
+cycles), and each response reaches it 6 cycles after the kernel sends it (`irq_resp`, then a
+2-beat read).  Each response is matched to its job by `job_id`.

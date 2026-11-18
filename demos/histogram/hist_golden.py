@@ -102,8 +102,13 @@ def parse_responses(words: np.ndarray) -> list[tuple[int, int]]:
     return out
 
 
-def check(jobs: list[Job], mem_out: np.ndarray, resp_words: np.ndarray) -> list[str]:
-    """Every count, every untouched region and every response.  Returns the failures."""
+def check(jobs: list[Job], mem_out: np.ndarray, resp_words: np.ndarray,
+          by_id: bool = False) -> list[str]:
+    """Every count, every untouched region and every response.  Returns the failures.
+
+    *by_id*: match each response to its job by ``job_id``, in any order -- what a host that
+    queues several jobs at once must do -- instead of requiring them in command order.  Each
+    job must still get exactly one response, with its status."""
     fails = []
     for j in jobs:
         got = mem_out[j.cnt_addr:j.cnt_addr + NBINS]
@@ -124,7 +129,18 @@ def check(jobs: list[Job], mem_out: np.ndarray, resp_words: np.ndarray) -> list[
     if len(resp_words) != len(jobs) * resp_nwords():
         fails.append(f"{len(resp_words)} response words, expected {len(jobs) * resp_nwords()} "
                      f"({len(jobs)} responses)")
-    if resps != exp_resps:
+    if by_id:
+        seen: dict[int, list[int]] = {}
+        for job_id, status in resps:
+            seen.setdefault(job_id, []).append(status)
+        for j in jobs:
+            got_st = seen.pop(j.job_id, [])
+            if got_st != [int(j.status())]:
+                fails.append(f"job {j.job_id}: responses with status {got_st}, "
+                             f"expected one with {int(j.status())}")
+        if seen:
+            fails.append(f"responses for unknown job ids {sorted(seen)}")
+    elif resps != exp_resps:
         fails.append(f"responses {resps}, expected {exp_resps}")
     return fails
 

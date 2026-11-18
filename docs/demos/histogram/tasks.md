@@ -8,7 +8,9 @@ has_children: false
 # The Tasks and Messages
 
 Everything on this page is shared by every version of the kernel. A version differs only in
-how the command reaches the control task and how the response leaves the response task.
+how the command reaches the control task and how the response leaves the response task: on
+AXI4-Streams in the [stream version](stream.md), through queues a host reaches over the bus in
+the [memory-mapped version](mm.md).
 
 ## The messages
 

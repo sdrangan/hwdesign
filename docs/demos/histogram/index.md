@@ -53,6 +53,8 @@ In going through this demo, you will:
    the body of each task. These are shared by every version of the kernel.
 2. [The stream version](stream.md): the top, with the command and response on AXI4-Streams;
    how it is built and checked; and the measured timing of each job.
+3. [The memory-mapped version](mm.md): the same kernel behind a memory-mapped slave adaptor,
+   so a host queues commands and collects responses with bus writes and reads.
 
 ## The code
 
@@ -65,6 +67,8 @@ Everything is in `hwdesign/demos/histogram`:
 | `histogram_stream.cpp` | the stream version's top |
 | `tb_histogram_stream.cpp` | its C simulation testbench |
 | `tb_xsi_histogram_stream.cpp` | its RTL testbench, run through XSI |
+| `histogram_mm.v` | the memory-mapped version's top: the slave adaptor and the kernel, in RTL |
+| `tb_xsi_histogram_mm.cpp` | its RTL testbench: a host model on the AXI slave port |
 | `hist_schema.py` | the command and response, as Waveflow data schemas |
 | `hist_golden.py` | the test jobs and the NumPy golden |
 | `hist_timing.py` | the per-job timing, measured from the RTL waveform |
@@ -76,4 +80,5 @@ To run all of it, in `hwdesign-venv` with Vitis and Vivado installed:
 (env) cd demos/histogram
 (env) python hist_build.py --through verify_csim    # C simulation: about 15 seconds
 (env) python hist_build.py                          # synthesis, RTL and timing: about 75 seconds
+(env) python hist_build.py --top mm                 # the memory-mapped version: about 90 seconds
 ```

@@ -262,8 +262,11 @@ def draw_timeline(rows: list[dict], png: Path, title: str) -> Path:
 
 
 def measure(vcd_path: Path, top: str, jobs, nbins: int, cmd_words: int, resp_words: int,
-            out_dir: Path, name: str, figure: bool) -> dict:
-    """timing_<name>.json and .md into *out_dir*; with *figure*, timeline.png too."""
+            out_dir: Path, name: str, figure: bool, title: str | None = None) -> dict:
+    """timing_<name>.json and .md into *out_dir*; with *figure*, timeline.png too.
+
+    *top* is the scope the kernel's signals are in: the top itself for the stream version, the
+    kernel instance (``histogram_mm.u_kernel``) for the mm version."""
     trace = load_trace(vcd_path, top, sorted({s for v in BEATS.values() for s in v} | set(EXTRA)))
     rows = job_table(trace, jobs, nbins, cmd_words, resp_words)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -275,5 +278,5 @@ def measure(vcd_path: Path, top: str, jobs, nbins: int, cmd_words: int, resp_wor
     png = None
     if figure:
         png = draw_timeline(rows, out_dir / "timeline.png",
-                            f"{top}: each job's phases, measured from the RTL (XSI)")
+                            title or f"{top}: each job's phases, measured from the RTL (XSI)")
     return {"rows": rows, "table": table, "png": png}
