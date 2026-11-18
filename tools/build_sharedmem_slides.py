@@ -13,16 +13,18 @@ way to rebuild it, and it refuses to run on its own output.
 WHAT IT DOES
 ------------
   * the unit is now Transactional Interfaces to Memory, in five sections
-    (plans/unit9_10_memory_pipelining.md): shared memory and interconnects,
-    transactional interfaces (adaptors, hls::task, tags), AXI4 bursts and
-    timing, memory-mapped queues and credit, and a histogram design example.
-    Sections 1-3 are built.  Section 2 runs on one example, a histogram
-    (demos/histogram, branch demo/histogram): the example, the protocol steps
-    (the old phase slides), the data mover, hls::task with the histogram's
-    top and its colour-mapped diagram, the control, compute and response
-    tasks' code, timing (illustrative numbers until the demo's measured ones
-    are final), and two practice pairs on y = a*x + b.
-    Section 3 is the old AXI4 signal slides, as reference.  The old deck's Vitis m_axi
+    (plans/unit9_10_memory_pipelining.md): shared memory and interconnects;
+    transactions and the data mover; concurrent tasks, on the histogram; AXI4
+    under the hood; memory-mapped queues and credit.  Sections 1-4 are built.
+    Sections 2 and 3 run on one example, a histogram (demos/histogram, branch
+    demo/histogram).  Section 2: the example, the protocol steps (the old
+    phase slides), the data mover, the read and write transactions as sequence
+    diagrams, a toy kernel (summem), and practice pairs on maxmem and on
+    drawing two reads.  Section 3: concurrent tasks, hls::task with the
+    histogram's top and its colour-mapped diagram, the control, compute and
+    response tasks' code, one job task by task, and timing (illustrative
+    numbers until the demo's measured ones are final).
+    Section 4 is the old AXI4 signal slides, as reference.  The old deck's Vitis m_axi
     histogram (slides 36-47) is left out, to be rebuilt around Waveflow's
     adaptors in section 5.
   * learning objectives: a table of skills for the whole unit.  The old
@@ -103,9 +105,9 @@ def homework(ids, qtags, y=6.2):
     return label(ids, L, y, W, 0.32, f"Homework in the LLM grader: {UNIT} › {names}", sz=12)
 
 
-SECTIONS = ["Shared Memory and Interconnects", "Transactional Interfaces",
-            "AXI4 Under the Hood", "Memory-Mapped Queues and Credit",
-            "Design Example: A Histogram"]
+SECTIONS = ["Shared Memory and Interconnects", "Transactions and the Data Mover",
+            "Concurrent Tasks: the Histogram", "AXI4 Under the Hood",
+            "Memory-Mapped Queues and Credit"]
 
 
 def s_outline(active):
@@ -585,6 +587,376 @@ def s_why_transactional(ids):
                 anchor="ctr"),
             sldnum_ph(ids)]
     return out
+
+
+# ---- the two transactions, as sequence diagrams ----------------------------
+# Lifelines for the kernel, the data mover and the memory; time runs down.
+
+SEQ_X = {"Kernel": 6.75, "Data mover": 9.25, "Memory": 11.75}
+SEQ_FILL = {"Kernel": (TINT, VIOLET), "Data mover": (SLATETINT, SLATE),
+            "Memory": (TEALTINT, TEAL)}
+
+
+def _seq_frame(ids, y0=1.8, y1=5.3):
+    out = []
+    for name, x in SEQ_X.items():
+        fill, line = SEQ_FILL[name]
+        out.append(shape(ids, x - 0.75, y0, 1.5, 0.42, fill=fill, line=line, lw=1.25,
+                         prst="roundRect", adj=20000,
+                         paras=[para(name, sz=12, color=TEXT, b=True, align="ctr")]))
+        out.append(arrow(ids, x, y0 + 0.42, x, y1, kit.GRAYLINE, lw=1.0, head=False, dash=True))
+    out.append(arrow(ids, 12.75, y0 + 0.6, 12.75, y1, MUTED, lw=1.0))
+    out.append(label(ids, 12.55, y1 + 0.02, 0.6, 0.3, "time", sz=10, align="ctr"))
+    return out
+
+
+def _msg(ids, a, b, y, color, text=None, lw=1.75, dash=False, above=True, sz=11):
+    xa, xb = SEQ_X[a], SEQ_X[b]
+    out = [arrow(ids, xa, y, xb, y, color, lw=lw, dash=dash)]
+    if text:
+        out.append(label(ids, min(xa, xb), y - 0.3 if above else y + 0.02, abs(xb - xa), 0.3,
+                         text, sz=sz, color=TEXT, align="ctr"))
+    return out
+
+
+def _beats(ids, a, b, y, n, color, step=0.11, lw=1.25):
+    return [arrow(ids, SEQ_X[a], y + k * step, SEQ_X[b], y + k * step, color, lw=lw)
+            for k in range(n)]
+
+
+TAG_NOTE = ("Both commands also carry a **tag**, `xfer_len` and `xfer_msg`, echoed back unread.  "
+            "We need it later: when the response goes to a **different kernel** than the one "
+            "that asked.")
+
+
+def s_read_txn(ids):
+    out = [title_ph(ids, "The Read Transaction"),
+           col(ids, L, 5.2, [
+               "A **transaction**: a command, then its response",
+               "**Read command**, `MRCmd` on `rd_cmd`",
+               ("-", "`addr`: where to start, a **word offset**, not a byte address"),
+               ("-", "`len`: how many words"),
+               "**Data response**: `len` words on `rd_data`, in order",
+               ("-", "The first after a latency L, then one a cycle"),
+               "The data **is** the response: the read is done when the last word arrives",
+               "Words, not types: the kernel **packs and unpacks** its values"],
+               h=3.9, sz=16, sub=14),
+           *_seq_frame(ids),
+           *_msg(ids, "Kernel", "Data mover", 2.6, VIOLET, "MRCmd: addr, len"),
+           *_msg(ids, "Data mover", "Memory", 2.85, SLATE, "address", lw=1.25),
+           *_beats(ids, "Memory", "Data mover", 3.55, 5, TEAL),
+           label(ids, SEQ_X["Data mover"], 3.2, SEQ_X["Memory"] - SEQ_X["Data mover"], 0.3,
+                 "burst", sz=11, color=TEXT, align="ctr"),
+           *_beats(ids, "Data mover", "Kernel", 3.75, 5, TEAL),
+           label(ids, SEQ_X["Kernel"], 4.3, SEQ_X["Data mover"] - SEQ_X["Kernel"], 0.3,
+                 "len words on rd_data", sz=11, color=TEXT, align="ctr"),
+           arrow(ids, 6.5, 2.65, 6.5, 3.75, AMBER, lw=1.25),
+           arrow(ids, 6.5, 3.75, 6.5, 2.65, AMBER, lw=1.25),
+           label(ids, 6.15, 3.05, 0.3, 0.3, "L", sz=12, color=AMBER, b=True, align="ctr"),
+           card(ids, L, 5.65, W, 0.6, [para(TAG_NOTE, sz=13, color=TEXT)], anchor="ctr"),
+           sldnum_ph(ids)]
+    return out
+
+
+def s_write_txn(ids):
+    out = [title_ph(ids, "The Write Transaction"),
+           col(ids, L, 5.2, [
+               "**Write command**, `MWCmd` on `wr_cmd`: `addr`, `len`",
+               "**Write data**: `len` words on `wr_data`",
+               ("-", "The data mover writes each word as it arrives"),
+               ("-", "The command may go first: the mover waits for the data"),
+               "**Write response**, `MemComplete` on `wr_done`",
+               ("-", "Sent once the memory has **acknowledged** the burst"),
+               "Only the response means **the data is in memory**.  The last data word does "
+               "not"],
+               h=3.9, sz=16, sub=14),
+           *_seq_frame(ids),
+           *_msg(ids, "Kernel", "Data mover", 2.65, VIOLET, "MWCmd: addr, len"),
+           *_beats(ids, "Kernel", "Data mover", 2.95, 5, TEAL),
+           label(ids, SEQ_X["Kernel"], 3.48, SEQ_X["Data mover"] - SEQ_X["Kernel"], 0.3,
+                 "len words on wr_data", sz=11, color=TEXT, align="ctr"),
+           *_msg(ids, "Data mover", "Memory", 3.1, SLATE, "address", lw=1.25),
+           *_beats(ids, "Data mover", "Memory", 3.25, 5, TEAL),
+           *_msg(ids, "Memory", "Data mover", 4.15, SLATE, "acknowledge", lw=1.25, dash=True),
+           *_msg(ids, "Data mover", "Kernel", 4.6, SLATE, "MemComplete: len", dash=True),
+           card(ids, L, 5.65, W, 0.6, [para(TAG_NOTE, sz=13, color=TEXT)], anchor="ctr"),
+           draft_note(ids, "Waveflow's write adaptor currently sends MemComplete a few cycles "
+                           "before the acknowledgement; a fix is in progress.", y=6.3),
+           sldnum_ph(ids)]
+    return out
+
+
+# ---- a toy kernel on the data mover: summem --------------------------------
+# The smallest kernel that uses a data mover: one command (addr, n) in, one read
+# command out, n 32-bit words in (one element per word), their sum out.  Then two
+# practice pairs: write a kernel like it (maxmem), and draw a kernel's activity.
+# Timing rules, stated on the slides: reading the command takes 2 cycles, sending
+# a read command 1; the mover's first word comes L cycles after it takes a command,
+# then one a cycle; the kernel adds each word as it arrives; the response is 1 cycle.
+
+SUM_SRC = """
+// summem: the sum of n 32-bit words from addr
+void summem(hls::stream<word_t>& s_cmd,     // in:  addr, n
+            hls::stream<word_t>& rd_cmd,    // to the data mover
+            hls::stream<word_t>& rd_data,   // from the data mover
+            hls::stream<word_t>& s_resp) {  // out: the sum
+    SumCmd c;
+    c.read_stream<32>(s_cmd);       // 1. the command
+
+    MRCmd rc;                       // 2. ask for the data
+    rc.addr = c.addr;               //    a word offset
+    rc.len  = c.n;                  //    one element per word
+    rc.xfer_len = 0;                //    no tag (later)
+    rc.write_stream<32>(rd_cmd);
+
+    word_t sum = 0;                 // 3. add as it arrives
+    for (int i = 0; i < c.n; i++) {
+#pragma HLS PIPELINE II=1
+        sum += rd_data.read();      //    waits for each word
+    }
+    s_resp.write(sum);              // 4. the response
+}"""
+
+SUM_L, SUM_N = 10, 32
+# the job's events, in cycles: command read, read command sent, data, response
+SUM_RC = 2
+SUM_D0 = SUM_RC + 1 + SUM_L
+SUM_D1 = SUM_D0 + SUM_N
+
+
+def s_sum_diagram(ids):
+    ky, kh = 2.35, 2.2                              # kernel and mover row
+    kx, kw = 6.0, 1.75
+    mx, mw = 8.55, 1.75
+    ix, iw = 10.85, 0.45
+    rx, rw = 11.6, 0.95
+    out = [title_ph(ids, "A Toy Kernel: summem"),
+           col(ids, L, 4.95, [
+               "A host puts n numbers in memory and asks: **what is their sum?**",
+               "The **command**: `addr` and `n`",
+               ("-", "32-bit data: **one element per word**"),
+               "The kernel sends the data mover **one read command**",
+               "It **adds each word as it arrives**",
+               "It sends the **sum** on a response stream",
+               "The kernel never touches memory: **streams only**"],
+               h=4.2, sz=16, sub=14),
+           shape(ids, kx, ky, kw, kh, fill=TINT, line=VIOLET, lw=1.25, prst="roundRect",
+                 adj=8000, paras=[para("summem", sz=15, color=TEXT, b=True, align="ctr"),
+                                  para("kernel", sz=12, color=MUTED, align="ctr")]),
+           shape(ids, mx, ky, mw, 1.3, fill=SLATETINT, line=SLATE, lw=1.25, prst="roundRect",
+                 adj=10000, paras=[para("Data mover", sz=14, color=TEXT, b=True, align="ctr"),
+                                   para("read", sz=12, color=MUTED, align="ctr")]),
+           shape(ids, ix, 1.95, iw, 3.4, fill=GRAYFILL, line=SLATE, lw=1.0,
+                 paras=[para("", sz=10)]),
+           label(ids, ix - 0.55, 5.4, iw + 1.1, 0.3, "Interconnect", sz=12, color=TEXT, b=True,
+                 align="ctr"),
+           shape(ids, rx, 2.35, rw, 2.2, fill=TEALTINT, line=TEAL, lw=1.25, prst="roundRect",
+                 adj=8000, paras=[para("Memory", sz=14, color=TEXT, b=True, align="ctr")]),
+           shape(ids, mx, 4.3, mw, 0.75, fill="F7F7F7", line=kit.GRAYLINE, lw=1.0,
+                 prst="roundRect", adj=12000,
+                 paras=[para("CPU", sz=13, color=TEXT, b=True, align="ctr"),
+                        para("another master", sz=11, color=MUTED, align="ctr")])]
+    k2, m2 = kx + kw, mx + mw
+    out += [
+        # the kernel's own streams, to and from the host
+        arrow(ids, kx + 0.55, 1.8, kx + 0.55, ky, VIOLET, lw=1.75),
+        label(ids, kx + 0.65, 1.85, 1.8, 0.3, "s_cmd: addr, n", sz=11, color=TEXT),
+        arrow(ids, kx + 1.2, ky + kh, kx + 1.2, ky + kh + 0.45, SLATE, lw=1.75),
+        label(ids, kx + 0.2, ky + kh + 0.48, 1.8, 0.3, "s_resp: sum", sz=11, color=TEXT),
+        # kernel <-> data mover
+        arrow(ids, k2, 2.65, mx, 2.65, VIOLET, lw=1.5),
+        label(ids, k2, 2.35, mx - k2, 0.3, "rd_cmd", sz=11, align="ctr"),
+        arrow(ids, mx, 3.25, k2, 3.25, TEAL, lw=1.5),
+        label(ids, k2, 2.95, mx - k2, 0.3, "rd_data", sz=11, align="ctr"),
+        # data mover and CPU on the interconnect, which reaches the memory
+        arrow(ids, m2, 3.0, ix, 3.0, TEAL, lw=2.0, head=False),
+        label(ids, m2, 2.7, ix - m2, 0.3, "m_axi", sz=11, align="ctr"),
+        arrow(ids, m2, 4.67, ix, 4.67, SLATE, lw=1.5, head=False, dash=True),
+        arrow(ids, ix + iw, 3.45, rx, 3.45, TEAL, lw=2.0, head=False),
+        band(ids, "The kernel says **what** to read; the data mover does the bus work.  "
+                  "The CPU wrote the numbers, through the same interconnect.", y=5.8, h=0.6,
+             sz=15),
+        sldnum_ph(ids)]
+    return out
+
+
+def s_sum_code(ids):
+    return [title_ph(ids, "summem: the Code"),
+            lo.code(ids, L, 1.75, 6.9, SUM_SRC, sz=10.5),
+            textbox(ids, 7.95, 1.75, 4.6, 4.4, [
+                kit.bullet("**Four streams**, no memory port: the data mover owns that", sz=15,
+                           spcBef=0),
+                kit.bullet("`MRCmd` is the data mover's read command: where and how many "
+                           "words.  Its tag fields come later", sz=15),
+                kit.bullet("`rd_data.read()` **blocks**: the loop runs as fast as the words "
+                           "come", sz=15),
+                kit.bullet("`sum +=` is a loop-carried add: one cycle, so **II = 1** (unit 7)",
+                           sz=15),
+                kit.bullet("The sum wraps at 32 bits.  A real kernel would widen it", sz=15)]),
+            sldnum_ph(ids)]
+
+
+def s_sum_timeline(ids):
+    cmd, data, comp = (SLATE, WHITE), (TEAL, WHITE), (VIOLET, WHITE)
+    lat, wait = (kit.AMBERTINT, AMBER), ("F4F4F4", MUTED)
+    rows = [("summem  kernel", [(0, SUM_RC, "cmd", *cmd), (SUM_RC, SUM_RC + 1, "", *cmd),
+                                (SUM_RC + 1, SUM_D0, "waits for data", *wait),
+                                (SUM_D0, SUM_D1, "adds each word as it arrives", *comp),
+                                (SUM_D1, SUM_D1 + 1, "", *cmd)]),
+            ("data mover", [(SUM_RC + 1, SUM_D0, "L", *lat),
+                            (SUM_D0, SUM_D1, f"{SUM_N} words", *data)])]
+    out = [title_ph(ids, "summem: When Each Task Works"),
+           *gantt(ids, rows, SUM_D1 + 3, [0, SUM_RC + 1, SUM_D0, SUM_D1], x=L, y=1.85, w=W,
+                  lab_w=1.85, row_h=0.6, gap=0.2)]
+    lx = L
+    for name, fill in (("command or response", SLATE), ("data", TEAL), ("compute", VIOLET),
+                       ("memory latency", kit.AMBERTINT), ("waiting", "F4F4F4")):
+        out.append(shape(ids, lx, 3.75, 0.3, 0.22, fill=fill, line=kit.GRAYLINE, lw=0.5))
+        out.append(label(ids, lx + 0.38, 3.7, 2.0, 0.3, name, sz=12, color=TEXT))
+        lx += 2.35
+    out += [textbox(ids, L, 4.2, W, 1.3, [
+                kit.bullet(f"The kernel sends its read command at cycle {SUM_RC}, then **waits**: "
+                           f"the first word comes L = {SUM_L} cycles later", sz=15, spcBef=0),
+                kit.bullet("Then both tasks are busy at once: the mover delivers a word a cycle, "
+                           "the kernel adds it the same cycle", sz=15)]),
+            band(ids, f"Job ≈ 2 + 1 + L + n + 1 = **{SUM_D1 + 1} cycles**.  The adding is free: "
+                      "it hides under the read.", y=5.6, h=0.6, sz=16),
+            sldnum_ph(ids)]
+    return out
+
+
+MAX_SRC = """
+void maxmem(hls::stream<word_t>& s_cmd, hls::stream<word_t>& rd_cmd,
+            hls::stream<word_t>& rd_data, hls::stream<word_t>& s_resp) {
+    SumCmd c;                         // addr, n  (n >= 1)
+    c.read_stream<32>(s_cmd);
+    MRCmd rc;
+    rc.addr = c.addr;  rc.len = c.n;  rc.xfer_len = 0;
+    rc.write_stream<32>(rd_cmd);
+
+    ap_int<32> best = rd_data.read(); // the first word
+    word_t idx = 0;
+    for (int i = 1; i < c.n; i++) {
+#pragma HLS PIPELINE II=1
+        ap_int<32> x = rd_data.read();
+        if (x > best) { best = x; idx = i; }
+    }
+    s_resp.write(best);
+    s_resp.write(idx);
+}"""
+
+
+def s_max_practice(ids):
+    return [title_ph(ids, "Writing a Kernel: maxmem"), pill(ids, "PRACTICE"),
+            textbox(ids, L, 1.75, W, 4.4, [
+                para("Write `maxmem`, a kernel like `summem`.  Its command is the same `addr` and "
+                     "`n` (n ≥ 1).  The data are **signed** 32-bit numbers, one per word.  It "
+                     "responds with **two words**: the largest value, then its index (the first, "
+                     "if there is a tie).", sz=16, color=TEXT, spcAft=8),
+                part("(a)", "Write the kernel: its streams, the read command and the loop", 16),
+                part("(b)", "Can the loop run at II = 1?  What is carried from one iteration to "
+                            "the next?", 16),
+                part("(c)", "A designer stops the loop early once `best` reaches 2³¹ − 1, since "
+                            "nothing can beat it.  What goes wrong, and in which job?", 16)]),
+            sldnum_ph(ids)]
+
+
+def s_max_solution(ids):
+    return [title_ph(ids, "Writing a Kernel: maxmem"), pill(ids, "SOLUTION"),
+            lo.code(ids, L, 1.75, 7.0, MAX_SRC, sz=9.5),
+            textbox(ids, 8.05, 1.75, 4.5, 4.5, [
+                part("(a)", "On the left.  The first word sets `best`, so no “smallest value” "
+                            "constant is needed", 14, spcBef=0),
+                part("(b)", "Yes: `best` and `idx` are carried, but a compare and a select fit "
+                            "in one cycle, like unit 7's accumulate", 14),
+                part("(c)", "The words not read stay in `rd_data`.  **The next job** reads them "
+                            "as its own data and answers wrong.  The kernel must read all n "
+                            "words, whatever it does with them", 14)]),
+            sldnum_ph(ids)]
+
+
+TWO_SRC = """
+SumCmd c;
+c.read_stream<32>(s_cmd);
+word_t sum = 0;
+for (int k = 0; k < 2; k++) {           // two halves
+    MRCmd rc;
+    rc.addr = c.addr + k * (c.n / 2);
+    rc.len  = c.n / 2;  rc.xfer_len = 0;
+    rc.write_stream<32>(rd_cmd);
+    for (int i = 0; i < c.n / 2; i++) {
+#pragma HLS PIPELINE II=1
+        sum += rd_data.read();
+    }
+}
+s_resp.write(sum);"""
+
+TWO_L, TWO_N = 10, 64
+
+
+def _two_times(up_front, outstanding):
+    """(rc2 sent, data2 start, response) for the two-half kernel, n = 64, L = 10."""
+    h = TWO_N // 2
+    d1 = SUM_RC + 1 + TWO_L                     # first half's first word
+    e1 = d1 + h
+    rc2 = SUM_RC + 1 if up_front else e1        # the cycle the second command is sent
+    free = rc2 + 1
+    if outstanding:
+        d2 = max(free + TWO_L, e1)              # its latency overlaps the first burst
+    else:
+        d2 = max(free, e1) + TWO_L              # taken only once the first burst ends
+    return rc2, d2, d2 + h
+
+
+def s_two_practice(ids):
+    return [title_ph(ids, "Drawing the Activity: Two Reads"), pill(ids, "PRACTICE"),
+            lo.code(ids, L, 1.75, 5.6, TWO_SRC, sz=10.5),
+            textbox(ids, 6.65, 1.75, 5.9, 4.5, [
+                para(f"This kernel sums n words in two halves.  Take n = {TWO_N}, "
+                     f"L = {TWO_L}.  Reading the command takes 2 cycles, sending a read command "
+                     "1.  The data mover takes one command at a time, when it is free; its first "
+                     "word comes L cycles later, then one a cycle.  Each word is added as it "
+                     "arrives, and the response takes 1 cycle.", sz=14, color=TEXT, spcAft=6),
+                part("(a)", "Draw the activity of the kernel and the data mover for one job.  "
+                            "When is the response sent?", 14),
+                part("(b)", "Send both read commands **before** the first loop.  Redraw.  "
+                            "When now?", 14),
+                part("(c)", "What would the data mover have to do for (b) to save the whole "
+                            "second L?", 14)]),
+            sldnum_ph(ids)]
+
+
+def s_two_solution(ids):
+    cmd, data, comp = (SLATE, WHITE), (TEAL, WHITE), (VIOLET, WHITE)
+    lat, wait = (kit.AMBERTINT, AMBER), ("F4F4F4", MUTED)
+    h = TWO_N // 2
+    d1 = SUM_RC + 1 + TWO_L
+    e1 = d1 + h
+    rc2a, d2a, ra = _two_times(False, False)
+    rc2b, d2b, rb = _two_times(True, False)
+    _, d2c, rc_ = _two_times(True, True)
+    rows = [("(a) kernel", [(0, SUM_RC, "", *cmd), (SUM_RC, SUM_RC + 1, "", *cmd),
+                            (SUM_RC + 1, d1, "", *wait), (d1, e1, "adds", *comp),
+                            (rc2a, rc2a + 1, "", *cmd), (rc2a + 1, d2a, "", *wait),
+                            (d2a, ra, "adds", *comp), (ra, ra + 1, "", *cmd)]),
+            ("(a) mover", [(SUM_RC + 1, d1, "L", *lat), (d1, e1, f"{h}", *data),
+                           (rc2a + 1, d2a, "L", *lat), (d2a, ra, f"{h}", *data)]),
+            ("(b) mover", [(SUM_RC + 1, d1, "L", *lat), (d1, e1, f"{h}", *data),
+                           (e1, d2b, "L", *lat), (d2b, rb, f"{h}", *data)]),
+            ("(c) mover", [(SUM_RC + 1, d1, "L", *lat), (d1, e1, f"{h}", *data),
+                           (d2c, rc_, f"{h}", *data)])]
+    return [title_ph(ids, "Drawing the Activity: Two Reads"), pill(ids, "SOLUTION"),
+            *gantt(ids, rows, ra + 3, [0, d1, e1, rc_, ra], x=L, y=1.75, w=W, lab_w=1.4,
+                   row_h=0.45, gap=0.12),
+            textbox(ids, L, 4.35, W, 1.9, [
+                part("(a)", f"The kernel asks for the second half only when the first is in: "
+                            f"a second L.  Response at cycle **{ra}**", 14, spcBef=0),
+                part("(b)", f"Only **{ra - rb}** cycle sooner, {rb}: the command waits in "
+                            f"`rd_cmd`, and the mover still pays L after the first burst", 14),
+                part("(c)", f"Take the next command **during** the burst (an outstanding "
+                            f"request), so its L overlaps the first half's data: cycle "
+                            f"**{rc_}**.  As written, the read adaptor takes one command per firing, so it does not; AXI allows it", 14)]),
+            sldnum_ph(ids)]
 
 
 def s_concurrent(ids):
@@ -1170,119 +1542,6 @@ def s_hist_timing(ids):
             sldnum_ph(ids)]
 
 
-SCALE_SKEL = """
-void scale_task(hls::stream<word_t>& s_cmd,
-                hls::stream<word_t>& rd_cmd,
-                hls::stream<word_t>& rd_data,
-                hls::stream<word_t>& wr_cmd,
-                hls::stream<word_t>& wr_data) {
-    ScaleCmd c;              // job, x_off, y_off, n, a, b
-    c.read_stream<64>(s_cmd);
-
-    MRCmd rc;                // (a)
-    rc.addr = ____;   rc.len = ____;
-    rc.xfer_len = 1;  rc.xfer_msg.data[0] = ____;
-    rc.write_stream<64>(rd_cmd);
-
-    MWCmd wc;                // (b)
-    wc.addr = ____;   wc.len = ____;
-    wc.xfer_len = 1;  wc.xfer_msg.data[0] = ____;
-    wc.write_stream<64>(wr_cmd);
-
-    // (c)  y[i] = a * x[i] + b, one word per cycle
-}"""
-
-SCALE_LOOP = """
-for (int i = 0; i < c.n; i++) {
-#pragma HLS PIPELINE II=1
-    word_t x = rd_data.read();
-    wr_data.write(c.a * x + c.b);
-}"""
-
-
-def s_scale_practice(ids):
-    return [title_ph(ids, "Writing a Task: y = a·x + b"), pill(ids, "PRACTICE"),
-            lo.code(ids, L, 1.75, 6.6, SCALE_SKEL, sz=10.5),
-            textbox(ids, 7.6, 1.75, 4.95, 4.4, [
-                para("One task reads a command with `x_off`, `y_off`, `n`, `a`, `b`, and drives "
-                     "a read and a write adaptor.  x and y are 64-bit, the memory's width: "
-                     "one element per word.", sz=15, color=TEXT, spcAft=6),
-                part("(a)", "Fill in the read command", 15),
-                part("(b)", "Fill in the write command", 15),
-                part("(c)", "Write the loop, at II = 1", 15),
-                part("(d)", "The write command goes out before any data.  Why is that safe?",
-                     15),
-                part("(e)", "Who should send the response to the host, and when?", 15)]),
-            sldnum_ph(ids)]
-
-
-def s_scale_solution(ids):
-    return [title_ph(ids, "Writing a Task: y = a·x + b"), pill(ids, "SOLUTION"),
-            textbox(ids, L, 1.8, 6.4, 4.4, [
-                part("(a)", "`rc.addr = c.x_off; rc.len = c.n;` tag `c.job`.  len = n only "
-                            "because each element fills a word: 16-bit x, four to a word, "
-                            "would need len = n/4 and a loop that unpacks", 15, spcBef=0),
-                part("(b)", "`wc.addr = c.y_off; wc.len = c.n;` tag `c.job`", 15),
-                part("(c)", "The loop on the right: one read and one write per iteration", 15),
-                part("(d)", "The writer only **queues** it: it writes each word as it arrives on "
-                            "`wr_data`, and waits otherwise", 15),
-                part("(e)", "Whoever reads the **write adaptor's completion**: only then are the "
-                            "words in memory.  Not this task: its last write leaves before they "
-                            "land", 15)]),
-            lo.code(ids, 7.35, 1.8, 5.2, SCALE_LOOP, sz=12),
-            errcard(ids, 7.35, 3.55, 5.2, 2.2, "Common errors",
-                    ["Byte addresses: the adaptors take word offsets.",
-                     "Leaving a completion stream unread: once its FIFO is full the adaptor "
-                     "stops, a deadlock several jobs later."]),
-            sldnum_ph(ids)]
-
-
-def s_scale_timing_practice(ids):
-    return [title_ph(ids, "Timing y = a·x + b"), pill(ids, "PRACTICE"),
-            lo.code(ids, L, 1.75, 5.2, SCALE_LOOP, sz=12),
-            label(ids, L, 3.4, 5.2, 2.6,
-                  "A read delivers its first word L cycles after its command, then one per "
-                  "cycle.  A write completes L cycles after its last word arrives.  The loop "
-                  "has pipeline depth D.  Use L = 10, D = 4, n = 1024, and let each transfer be "
-                  "one burst.", sz=14, color=TEXT),
-            textbox(ids, 6.3, 1.75, 6.25, 4.4, [
-                part("(a)", "Draw the read, compute and write on one timeline.  When does the "
-                            "write complete?", 15, spcBef=0),
-                part("(b)", "The loop only reaches II = 2.  When now?", 15),
-                part("(c)", "Another version first copies all of x into a local array, then "
-                            "computes y into another, then streams y out.  When?", 15),
-                part("(d)", "Which version would you build, and when is the other one "
-                            "necessary?", 15)]),
-            sldnum_ph(ids)]
-
-
-def s_scale_timing_solution(ids):
-    L_, D_, n_ = 10, 4, 1024
-    a_ = 2 * L_ + D_ + n_
-    b_ = 2 * L_ + D_ + 2 * n_
-    c_ = 2 * L_ + 3 * n_ + D_
-    lat = (GRAYFILL, TEXT)
-    rows = [("Read x", [(0, L_, "", *lat), (L_, L_ + n_, "x", TEAL, WHITE)]),
-            ("Compute", [(L_ + 1, L_ + D_ + n_, "a·x + b", VIOLET, WHITE)]),
-            ("Write y", [(L_ + D_, L_ + D_ + n_, "y", TEAL, WHITE),
-                         (L_ + D_ + n_, a_, "", *lat)])]
-    return [title_ph(ids, "Timing y = a·x + b"), pill(ids, "SOLUTION"),
-            *gantt(ids, rows, a_, [0, a_], x=L, y=1.85, w=6.2),
-            textbox(ids, 7.25, 1.8, 5.3, 4.3, [
-                part("(a)", f"All three overlap: the last y reaches the writer at L + D + n, so "
-                            f"it completes at 2L + D + n = !!{a_:,}!!", 14, spcBef=0),
-                part("(b)", f"The full stream holds back the read: one word per 2 cycles, "
-                            f"!!≈ {b_:,}!!", 14),
-                part("(c)", f"Three phases in sequence: (L + n) + (n + D) + (n + L) = "
-                            f"!!{c_:,}!!, about 3×", 14),
-                part("(d)", "Stream when each word is used once, in order.  Buffer when it is "
-                            "reused or read out of order, as the histogram's counts are.  "
-                            "Unit 10 overlaps the buffered phases across jobs", 14)]),
-            label(ids, L, 4.2, 6.2, 0.5, "(a), to scale: read, compute and write overlap.",
-                  sz=12),
-            sldnum_ph(ids)]
-
-
 # ============================================================== passes ====
 MIGRATED_MARKER = "Bus or Crossbar?"   # a slide only this script makes
 
@@ -1315,18 +1574,22 @@ PLAN = [
     ("old", 15, None),
     ("new", s_xbar_demo), ("new", s_xbar_area), ("new", s_xbar_cycles),
     ("new", s_xbar_timeline),
-    # section 2: transactional interfaces, on a running example
+    # section 2: transactions and the data mover
     ("new", s_outline(1)), ("new", s_hist_example),
     ("old", 20, None), ("old", 21, None), ("old", 22, None), ("new", s_hist_format),
-    ("new", s_why_transactional), ("new", s_concurrent), ("new", s_hls_task),
-    ("new", s_top_mapped), ("new", s_task_streams), ("new", s_read_adaptor), ("new", s_tags),
+    ("new", s_why_transactional), ("new", s_read_txn), ("new", s_write_txn),
+    ("new", s_sum_diagram), ("new", s_sum_code), ("new", s_sum_timeline),
+    ("new", s_max_practice), ("new", s_max_solution),
+    ("new", s_two_practice), ("new", s_two_solution),
+    # section 3: concurrent tasks, on the histogram
+    ("new", s_outline(2)),
+    ("new", s_concurrent), ("new", s_hls_task),
+    ("new", s_top_mapped), ("new", s_task_streams), ("new", s_tags),
     ("new", s_hist_ctrl), ("new", s_hist_compute), ("new", s_hist_resp),
     ("new", s_job_tasks),
-    ("new", s_scale_practice), ("new", s_scale_solution),
     ("new", s_burst_timing), ("new", s_hist_timing),
-    ("new", s_scale_timing_practice), ("new", s_scale_timing_solution),
-    # section 3: AXI4 under the hood
-    ("new", s_outline(2)),
+    # section 4: AXI4 under the hood
+    ("new", s_outline(3)),
     ("old", 28, None), ("old", 29, None), ("old", 32, None), ("old", 33, None),
     ("old", 34, None),
 ]

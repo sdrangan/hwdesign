@@ -77,7 +77,7 @@ Notes:
 - Pending: a crossbar-vs-bus area and latency demo on the Zynq-7020, from
   Waveflow's `xbar_profile` (SAMD vs SASD), placed after the crossbar timeline.
 
-### 2. Transactional interfaces
+### 2–3. Transactions and the data mover; concurrent tasks (the histogram)
 
 Skills:
 
@@ -86,30 +86,38 @@ Skills:
 - Write a kernel's tasks against that interface.
 - Draw simple timing diagrams to estimate when transactions and a job complete.
 
-Structure (decided 2026-11-17): one running example, a **histogram**, carries
-the whole section.
+Structure (revised 2026-11-17): the old section 2 grew to 31 slides and was
+split in two. One running example, a **histogram**, carries both.
+
+Section 2, transactions and the data mover:
 
 1. The motivating example (`histogram_stream`: command and response on streams,
    driven directly by the testbench).
 2. The steps of the protocol (the kept command / compute / response phase
    slides), then the histogram's command and response formats.
-3. The data mover, concurrent tasks, `hls::task`, the colour-mapped top, the
-   rules for streams between tasks, the read adaptor, tags.
-4. The code of each histogram task (control, compute, response) and its top.
-5. Timing: a burst, then a histogram job (compute overlaps the read; the
-   counts wait for the last sample).
-6. Two questions, each a practice/solution pair:
-   - write a task, y = a·x + b: fill in the read and write commands and the
-     loop. A different kernel from the histogram on purpose, so it tests
-     writing rather than copying;
-   - time y = a·x + b from its code: streaming (2L + D + n), at II = 2, and a
-     buffered version ((L + n) + (n + D) + (n + L)).
+3. The data mover; the read and write transactions as sequence diagrams.
+4. A toy kernel, `summem` (one task and a read mover): diagram, code, timeline.
+5. Practice pairs: write `maxmem` (its (c) shows why a kernel must drain every
+   word it asked for), and draw the activity of a two-read kernel (previews
+   outstanding requests).
 
-The histogram's code, formats and measured numbers come from `demos/histogram`
-(being built on branch `demo/histogram`). Until then the task-code slides are
-placeholders, and the format and timing slides carry a draft note.
-`histogram_mm` (section 4) is the same kernel with the command and response in
-memory-mapped queues, in the same directory.
+Section 3, concurrent tasks on the histogram:
+
+1. Concurrent tasks, `hls::task`, the histogram's top colour-mapped against its
+   diagram, the rules for streams between tasks, tags.
+2. The control, compute and response tasks' code; one job, task by task.
+3. Timing: a burst, then a histogram job (compute overlaps the read; the
+   counts wait for the last sample).
+
+The y = a·x + b practice pairs were dropped as duplicates of `maxmem` and the
+two-reads problem.
+
+The histogram's code and formats are final, from `demos/histogram` (branch
+`demo/histogram`). Its measured timing is not: the timing slides use
+illustrative numbers, and the write transaction and response task carry a draft
+note until Waveflow's write adaptor sends its completion after the memory's
+acknowledgement. `histogram_mm` (section 5) is the same kernel with the command
+and response in memory-mapped queues, in the same directory.
 
 Notes:
 
@@ -138,14 +146,14 @@ Notes:
   `latency_init + n * latency_per_word` cycles, plus bus request and return
   latency. Unit 10 then asks what happens when the phases overlap across jobs.
 
-### 3. AXI4 under the hood
+### 4. AXI4 under the hood
 
 A short section of signal-level reference, kept from the old deck: AXI family,
 AXI4-MM features, the AXI4-Lite review, burst signals, the write example. The
 homework's AXI waveform problems point here. The write example's figure
 disagrees with its bullets and with AXI (`AWLEN` is beats - 1): fix the figure.
 
-### 4. MM queues and credit
+### 5. MM queues and credit (and histogram_mm)
 
 Frame as **how others reach your kernel**: the slave views (register bank,
 queue in, queue out, BRAM window).
@@ -162,7 +170,7 @@ Notes:
   and the consumer returns a cumulative count of words consumed
   (`credit::Producer` / `credit::Consumer` in HLS).
 
-### 5. Design example: histogram
+### Design example: histogram (now the running example of sections 2-3)
 
 Built fresh in the new style:
 
