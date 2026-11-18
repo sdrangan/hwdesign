@@ -16,9 +16,11 @@ WHAT IT DOES
     (plans/unit9_10_memory_pipelining.md): shared memory and interconnects,
     transactional interfaces (adaptors, hls::task, tags), AXI4 bursts and
     timing, memory-mapped queues and credit, and a histogram design example.
-    Sections 1-3 are built.  Section 2 keeps the old transaction-phase slides
-    and adds the adaptors, hls::task and tags; section 3 keeps the old AXI4
-    signal slides and adds burst and job timing.  The old deck's Vitis m_axi
+    Sections 1-3 are built.  Section 2 runs on one example, a histogram
+    (demos/histogram, being built): the example, the protocol steps (the old
+    phase slides), the data mover, hls::task, the tasks' code (placeholders
+    until the demo lands), timing, and two practice pairs on y = a*x + b.
+    Section 3 is the old AXI4 signal slides, as reference.  The old deck's Vitis m_axi
     histogram (slides 36-47) is left out, to be rebuilt around Waveflow's
     adaptors in section 5.
   * learning objectives: a table of skills for the whole unit.  The old
@@ -100,7 +102,7 @@ def homework(ids, qtags, y=6.2):
 
 
 SECTIONS = ["Shared Memory and Interconnects", "Transactional Interfaces",
-            "AXI4 Bursts and Timing", "Memory-Mapped Queues and Credit",
+            "AXI4 Under the Hood", "Memory-Mapped Queues and Credit",
             "Design Example: A Histogram"]
 
 
@@ -539,7 +541,7 @@ def gantt(ids, rows, tmax, ticks, x=5.9, y=2.0, w=6.65, lab_w=1.2, row_h=0.46, g
 
 def s_why_transactional(ids):
     kx, ax, mx = 6.3, 8.55, 11.0
-    out = [title_ph(ids, "Why a Transactional Interface?"),
+    out = [title_ph(ids, "A Data Mover for Memory"),
            col(ids, L, 5.3, [
                "A kernel could drive its `m_axi` port itself",
                ("-", "Addresses, bursts and waiting all mixed into the compute"),
@@ -792,45 +794,6 @@ def s_read_adaptor(ids):
             sldnum_ph(ids)]
 
 
-KERNEL_RD = """
-MRCmd rc;                        // read n words of x
-rc.addr = x_off;   rc.len = n;
-rc.xfer_len = 1;   rc.xfer_msg.data[0] = job;
-rc.write_stream<64>(rd_cmd);
-
-for (int i = 0; i < n; i++) {
-#pragma HLS PIPELINE II=1
-    x[i] = rd_data.read();
-}
-MemComplete rd;
-rd.read_stream<64>(rd_done);     // tag == job"""
-
-KERNEL_WR = """
-MWCmd wc;                        // write n words of y
-wc.addr = y_off;   wc.len = n;
-wc.xfer_len = 1;   wc.xfer_msg.data[0] = job;
-wc.write_stream<64>(wr_cmd);
-
-for (int i = 0; i < n; i++) {
-#pragma HLS PIPELINE II=1
-    wr_data.write(y[i]);
-}
-MemComplete wd;
-wd.read_stream<64>(wr_done);     // after the write lands"""
-
-
-def s_kernel_use(ids):
-    return [title_ph(ids, "Using the Adaptors from a Kernel"),
-            kit.heading(ids, L, 1.75, 5.75, "READ"),
-            lo.code(ids, L, 2.1, 5.75, KERNEL_RD, sz=11),
-            kit.heading(ids, 6.8, 1.75, 5.75, "WRITE"),
-            lo.code(ids, 6.8, 2.1, 5.75, KERNEL_WR, sz=11),
-            band(ids, "Every access to memory is a **command**, a stream of **data**, and a "
-                      "**completion**.  The kernel never touches an address bus.",
-                 y=5.45, h=0.65, sz=15),
-            sldnum_ph(ids)]
-
-
 def s_tags(ids):
     fb = kit.field_bar
     return [title_ph(ids, "Tags: Matching Completions"),
@@ -888,107 +851,255 @@ def s_burst_timing(ids):
 JOB_L, JOB_N, JOB_D = 10, 64, 6
 
 
-def _job_rows(L_, n, d):
-    r_end = L_ + n
-    c_end = r_end + n + d
-    w_end = c_end + L_ + n
+# ---- section 2's running example: a histogram ------------------------------
+# The code and the measured numbers come from demos/histogram (being built on
+# branch demo/histogram).  Until then the slides that need them carry a draft
+# note or a placeholder.
+
+def draft_note(ids, text, y=6.2):
+    return label(ids, L, y, W, 0.32, f"^^Draft^^: {text}", sz=12)
+
+
+def placeholder(ids, title, lines):
+    return [title_ph(ids, title),
+            shape(ids, L, 1.8, W, 3.9, fill="FFFBF7", line=AMBER, lw=1.25, dash=True,
+                  anchor="t", inset=0.3,
+                  paras=[para("^^To come from demos/histogram^^", sz=16, spcAft=8)] +
+                        [kit.bullet(t, sz=15) for t in lines]),
+            sldnum_ph(ids)]
+
+
+def s_hist_example(ids):
+    out = [title_ph(ids, "A Running Example: A Histogram"),
+           col(ids, L, 5.7, [
+               "Count how many of n samples fall in each of a few **bins**",
+               ("-", "Bin = x >> shift: uniform bins, no search"),
+               "A good first example",
+               ("-", "The samples are many: they live in **memory**"),
+               ("-", "The result is small: a few counts"),
+               ("-", "Each sample is read once"),
+               "The host puts the samples in memory and sends a **command**; the kernel "
+               "reads, counts, writes the counts back, and sends a **response**"],
+               h=4.0, sz=16, sub=14)]
+    tb, kx, dy = (6.95, 1.95, 1.6, 2.1), (9.75, 1.95, 2.0, 2.1), 4.55
+    out += [shape(ids, tb[0], tb[1], tb[2], tb[3], fill=SLATETINT, line=SLATE, lw=1.25,
+                  prst="roundRect", adj=8000, anchor="t", inset=0.15,
+                  paras=[para("Host or testbench", sz=14, color=TEXT, b=True, align="ctr")]),
+            shape(ids, kx[0], kx[1], kx[2], kx[3], fill=TINT, line=VIOLET, lw=1.25,
+                  prst="roundRect", adj=8000,
+                  paras=[para("Histogram kernel", sz=14, color=TEXT, b=True, align="ctr")]),
+            arrow(ids, tb[0] + tb[2], 2.45, kx[0], 2.45, SLATE, lw=1.75),
+            label(ids, tb[0] + tb[2], 2.1, kx[0] - tb[0] - tb[2], 0.3, "s_cmd", sz=12,
+                  color=SLATE, b=True, align="ctr"),
+            arrow(ids, kx[0], 3.55, tb[0] + tb[2], 3.55, SLATE, lw=1.75),
+            label(ids, tb[0] + tb[2], 3.2, kx[0] - tb[0] - tb[2], 0.3, "s_done", sz=12,
+                  color=SLATE, b=True, align="ctr"),
+            shape(ids, 6.95, dy, 4.8, 0.6, fill=TEALTINT, line=TEAL, lw=1.25, prst="roundRect",
+                  adj=20000, paras=[para("DDR: samples in, counts out", sz=14, color=TEXT, b=True,
+                                         align="ctr")]),
+            arrow(ids, 10.35, dy, 10.35, kx[1] + kx[3], TEAL, lw=1.75),
+            arrow(ids, 11.15, kx[1] + kx[3], 11.15, dy, TEAL, lw=1.75),
+            label(ids, 9.4, 4.1, 0.9, 0.3, "samples", sz=11, color=TEAL, align="r"),
+            label(ids, 11.25, 4.1, 0.9, 0.3, "counts", sz=11, color=TEAL)]
+    # a small histogram, for the eye
+    for k, hgt in enumerate([0.2, 0.45, 0.75, 0.95, 0.65, 0.35, 0.15]):
+        out.append(shape(ids, 7.2 + k * 0.17, 3.85 - hgt, 0.14, hgt, fill=VIOLET, line=None))
+    out += [band(ids, "`histogram_stream`: command and response on **streams**.  Section 4: the "
+                      "same kernel with them in memory-mapped queues, `histogram_mm`.",
+                 y=5.45, h=0.7, sz=15),
+            sldnum_ph(ids)]
+    return out
+
+
+def s_hist_format(ids):
+    cmd = [["Command field", "Meaning"],
+           ["`job`", "A number the host chooses; echoed in the response"],
+           ["`samp_off`, `n`", "Where the samples are (a **word offset**), and how many"],
+           ["`cnt_off`", "Where to write the counts"],
+           ["`shift`", "The bin width: bin = x >> shift"]]
+    rsp = [["Response field", "Meaning"],
+           ["`job`", "Which command this answers"],
+           ["`status`", "0: done.  Nonzero: refused, e.g. n too large"]]
+    return [title_ph(ids, "Histogram: Command and Response"),
+            table(ids, L, 1.8, [2.1, 4.6], cmd, rowh=0.48, sz=14),
+            table(ids, 7.75, 1.8, [1.7, 3.1], rsp, rowh=0.48, sz=14),
+            textbox(ids, 7.75, 3.4, 4.8, 2.0, [
+                kit.bullet("Each is one message on a stream, as in unit 5", sz=14, spcBef=0),
+                kit.bullet("The response is sent only **after the counts are in memory**: the "
+                           "host may read them as soon as it arrives", sz=14)]),
+            draft_note(ids, "the fields will match demos/histogram's code once it is built."),
+            sldnum_ph(ids)]
+
+
+def s_hist_tasks(ids):
+    return placeholder(ids, "The Histogram's Tasks", [
+        "The block diagram of the histogram's top: control, read adaptor, compute, write "
+        "adaptor, response",
+        "The top's code beside it, coloured as on the copy kernel: interfaces, tasks, streams",
+        "What each stream carries: commands, samples, counts, completions"])
+
+
+def s_hist_ctrl(ids):
+    return placeholder(ids, "The Control Task", [
+        "Reads the command; checks it; issues the MRCmd for the samples and the MWCmd for the "
+        "counts, both tagged with the job",
+        "Passes a job descriptor (n, shift) to the compute task"])
+
+
+def s_hist_compute(ids):
+    return placeholder(ids, "The Compute Task", [
+        "Takes the descriptor, then n samples straight off the read stream",
+        "counts[x >> shift]++ at II = 1, and how the read-modify-write on a repeated bin is "
+        "handled (unit 7)",
+        "Streams the counts to the write adaptor"])
+
+
+def s_hist_resp(ids):
+    return placeholder(ids, "The Response Task", [
+        "Waits for the write adaptor's completion: the counts are in memory",
+        "Sends the response with the job from the completion's tag"])
+
+
+H_L, H_N, H_D, H_NB = 10, 256, 4, 16
+
+
+def s_hist_timing(ids):
+    r_end = H_L + H_N
+    c_end = r_end + H_D
+    w_end = c_end + H_L + H_NB
     lat = (GRAYFILL, TEXT)
-    return ([("Read x", [(0, L_, "L", *lat), (L_, r_end, f"{n} words", TEAL, WHITE)]),
-             ("Compute", [(r_end, c_end, f"{n} + {d}", VIOLET, WHITE)]),
-             ("Write y", [(c_end, c_end + L_, "L", *lat),
-                          (c_end + L_, w_end, f"{n} words", TEAL, WHITE)])],
-            [0, r_end, c_end, w_end])
-
-
-def s_job_timing(ids):
-    rows, ticks = _job_rows(JOB_L, JOB_N, JOB_D)
-    total = ticks[-1]
-    return [title_ph(ids, "Timing a Job"),
+    rows = [("Read samples", [(0, H_L, "L", *lat), (H_L, r_end, f"{H_N} samples", TEAL, WHITE)]),
+            ("Compute", [(H_L + 1, c_end, "one sample per cycle, as they arrive", VIOLET,
+                          WHITE)]),
+            ("Write counts", [(c_end, c_end + H_L, "L", *lat),
+                              (c_end + H_L, w_end, f"{H_NB}", TEAL, WHITE)]),
+            ("Response", [(w_end, w_end + 3, "", SLATE, WHITE)])]
+    return [title_ph(ids, "Timing a Histogram Job"),
             col(ids, L, 4.9, [
-                "Load, compute, store, **one after another**",
-                ("-", f"Read: L + n"),
-                ("-", "Compute, pipelined at II = 1: n + its depth D"),
-                ("-", "Write: L + n"),
-                "Then the completion goes back to the host"],
-                h=3.2, sz=16, sub=14),
-            *gantt(ids, rows, total, ticks),
-            label(ids, 5.9, 4.1, 6.65, 0.6,
-                  f"n = {JOB_N} words, L = {JOB_L}, D = {JOB_D}: the job takes {total} cycles, "
-                  f"and memory is idle for the {JOB_N + JOB_D} of the compute.", sz=13,
-                  color=TEXT),
-            band(ids, "Job time ≈ (L + n_{in}) + (n + D) + (L + n_{out}).  Unit 10 overlaps the "
-                      "three phases across jobs.", y=5.3, h=0.65, sz=16),
+                "The read: L, then one sample per cycle",
+                "Compute takes each sample **as it arrives**: no buffer, it hides under the read",
+                "The counts wait for the **last** sample, then a short write",
+                "The response waits for the write's completion"],
+                h=3.4, sz=15, sub=13),
+            *gantt(ids, rows, w_end + 3, [0, c_end, w_end]),
+            label(ids, 5.9, 4.6, 6.65, 0.5,
+                  f"n = {H_N}, L = {H_L}, pipeline depth D = {H_D}, {H_NB} bins: about "
+                  f"{w_end} cycles", sz=13, color=TEXT),
+            band(ids, "Job ≈ L + n + D + L + bins.  The compute costs almost nothing: it "
+                      "overlaps the read.", y=5.3, h=0.6, sz=16),
+            draft_note(ids, "illustrative numbers.  The measured ones come from "
+                            "demos/histogram under XSI."),
             sldnum_ph(ids)]
 
 
-def s_job_practice(ids):
-    return [title_ph(ids, "Timing a Vector Add"), pill(ids, "PRACTICE"),
-            textbox(ids, L, 1.8, 11.8, 4.4, [
-                para("A kernel computes z = x + y on N-word vectors.  It loads x, then y, through "
-                     "one read adaptor into local buffers; adds them at II = 1 with a pipeline "
-                     "depth of 4; then writes z through a write adaptor.  Each burst costs L + n "
-                     "with L = 10, and a burst is at most 256 words.", sz=16, color=TEXT,
+SCALE_SKEL = """
+void scale_task(hls::stream<word_t>& s_cmd,
+                hls::stream<word_t>& rd_cmd,
+                hls::stream<word_t>& rd_data,
+                hls::stream<word_t>& wr_cmd,
+                hls::stream<word_t>& wr_data) {
+    ScaleCmd c;              // job, x_off, y_off, n, a, b
+    c.read_stream<64>(s_cmd);
+
+    MRCmd rc;                // (a)
+    rc.addr = ____;   rc.len = ____;
+    rc.xfer_len = 1;  rc.xfer_msg.data[0] = ____;
+    rc.write_stream<64>(rd_cmd);
+
+    MWCmd wc;                // (b)
+    wc.addr = ____;   wc.len = ____;
+    wc.xfer_len = 1;  wc.xfer_msg.data[0] = ____;
+    wc.write_stream<64>(wr_cmd);
+
+    // (c)  y[i] = a * x[i] + b, one word per cycle
+}"""
+
+SCALE_LOOP = """
+for (int i = 0; i < c.n; i++) {
+#pragma HLS PIPELINE II=1
+    word_t x = rd_data.read();
+    wr_data.write(c.a * x + c.b);
+}"""
+
+
+def s_scale_practice(ids):
+    return [title_ph(ids, "Writing a Task: y = a·x + b"), pill(ids, "PRACTICE"),
+            lo.code(ids, L, 1.75, 6.6, SCALE_SKEL, sz=10.5),
+            textbox(ids, 7.6, 1.75, 4.95, 4.4, [
+                para("One task reads a command with `x_off`, `y_off`, `n`, `a`, `b`, and drives "
+                     "a read and a write adaptor.  One element per word.", sz=15, color=TEXT,
                      spcAft=6),
-                part("(a)", "N = 256.  How many cycles does one job take?", 16),
-                part("(b)", "N = 1024.  How many cycles now?  How many of them are latency L?", 16),
-                part("(c)", "N = 1024, with x and y in two different memories, each read by its "
-                            "own adaptor through a crossbar.  How many cycles?", 16)]),
+                part("(a)", "Fill in the read command", 15),
+                part("(b)", "Fill in the write command", 15),
+                part("(c)", "Write the loop, at II = 1", 15),
+                part("(d)", "The write command goes out before any data.  Why is that safe?",
+                     15),
+                part("(e)", "Who should send the response to the host, and when?", 15)]),
             sldnum_ph(ids)]
 
 
-def s_job_solution(ids):
-    return [title_ph(ids, "Timing a Vector Add"), pill(ids, "SOLUTION"),
-            textbox(ids, L, 1.8, 7.0, 4.4, [
-                part("(a)", "Read x 266, read y 266, add 256 + 4 = 260, write 266: "
-                            "!!1,058 cycles!!", 15, spcBef=0),
-                part("(b)", "Each vector is 4 bursts.  Reads 8 × 266 = 2,128; add 1,028; "
-                            "writes 4 × 266 = 1,064: !!4,220 cycles!!, of which 12 × 10 = "
-                            "!!120!! are latency", 15),
-                part("(c)", "The two reads run at once: 4 × 266 = 1,064 to load both.  "
-                            "1,064 + 1,028 + 1,064 = !!3,156 cycles!!, 1.34× faster", 15),
-                kit.cont("Still three phases in sequence: memory sits idle during the add.  "
-                     "Unit 10 overlaps them.", 15, color=MUTED, spcBef=8)]),
-            errcard(ids, 8.05, 1.8, 4.5, 2.6, "Common errors",
-                    ["Paying L once for a 1,024-word vector: an AXI burst is at most 256 "
-                     "beats.",
-                     "Counting the add as N cycles: a pipeline of depth D adds D."]),
-            sldnum_ph(ids)]
-
-
-def s_cmd_practice(ids):
-    return [title_ph(ids, "Commands for a Convolution"), pill(ids, "PRACTICE"),
-            textbox(ids, L, 1.8, 11.8, 4.4, [
-                para("A kernel computes y[n] = Σ_{i} h[i] x[n − i] for n = 0, …, n_{x} + n_{k} − 2, "
-                     "with x zero outside 0 … n_{x} − 1.  The host has put x (n_{x} samples) "
-                     "and h (n_{k} taps) in DDR, one per word, and chosen where y goes.  A "
-                     "control task in the kernel reads the host's command and drives a read and "
-                     "a write adaptor.", sz=16, color=TEXT, spcAft=6),
-                part("(a)", "What fields does the host's command need?", 16),
-                part("(b)", "List the `MRCmd` and `MWCmd` the control task issues for one job: "
-                            "`addr`, `len` and tag for each.  In what order?", 16),
-                part("(c)", "What should the tags carry, and why?", 16)]),
-            sldnum_ph(ids)]
-
-
-def s_cmd_solution(ids):
-    hi = {"color": TEAL, "b": True}
-    rows = [["Command", "addr", "len", "tag"],
-            [{"t": "MRCmd", **hi}, "h_off", "n_{k}", "job, h"],
-            [{"t": "MRCmd", **hi}, "x_off", "n_{x}", "job, x"],
-            [{"t": "MWCmd", **hi}, "y_off", "n_{x} + n_{k} − 1", "job"]]
-    return [title_ph(ids, "Commands for a Convolution"), pill(ids, "SOLUTION"),
+def s_scale_solution(ids):
+    return [title_ph(ids, "Writing a Task: y = a·x + b"), pill(ids, "SOLUTION"),
             textbox(ids, L, 1.8, 6.4, 4.4, [
-                part("(a)", "A job number; `x_off` and n_{x}; `h_off` and n_{k}; `y_off`.  "
-                            "The output length follows: n_{x} + n_{k} − 1", 15, spcBef=0),
-                part("(b)", "The table.  The taps first, so they are in place before the "
-                            "samples stream through", 15),
-                part("(c)", "The **job number**, and which buffer: the completion then says which "
-                            "read finished for which job, and the response to the host can name "
-                            "its job.  The adaptor never reads it", 15)]),
-            table(ids, 7.35, 1.8, [1.35, 1.0, 1.75, 1.1], ctr(rows), rowh=0.45, sz=14),
-            errcard(ids, 7.35, 3.85, 5.2, 1.75, "Common errors",
-                    ["Byte addresses: the adaptor takes word offsets.",
-                     "Writing n_{x} outputs: a full convolution has n_{x} + n_{k} − 1."]),
+                part("(a)", "`rc.addr = c.x_off; rc.len = c.n;` tag `c.job`", 15, spcBef=0),
+                part("(b)", "`wc.addr = c.y_off; wc.len = c.n;` tag `c.job`", 15),
+                part("(c)", "The loop on the right: one read and one write per iteration", 15),
+                part("(d)", "The writer only **queues** it: it writes each word as it arrives on "
+                            "`wr_data`, and waits otherwise", 15),
+                part("(e)", "Whoever reads the **write adaptor's completion**: only then are the "
+                            "words in memory.  Not this task: its last write leaves before they "
+                            "land", 15)]),
+            lo.code(ids, 7.35, 1.8, 5.2, SCALE_LOOP, sz=12),
+            errcard(ids, 7.35, 3.55, 5.2, 2.2, "Common errors",
+                    ["Byte addresses: the adaptors take word offsets.",
+                     "Leaving a completion stream unread: once its FIFO is full the adaptor "
+                     "stops, a deadlock several jobs later."]),
+            sldnum_ph(ids)]
+
+
+def s_scale_timing_practice(ids):
+    return [title_ph(ids, "Timing y = a·x + b"), pill(ids, "PRACTICE"),
+            lo.code(ids, L, 1.75, 5.2, SCALE_LOOP, sz=12),
+            label(ids, L, 3.4, 5.2, 2.6,
+                  "A read delivers its first word L cycles after its command, then one per "
+                  "cycle.  A write completes L cycles after its last word arrives.  The loop "
+                  "has pipeline depth D.  Use L = 10, D = 4, n = 1024, and let each transfer be "
+                  "one burst.", sz=14, color=TEXT),
+            textbox(ids, 6.3, 1.75, 6.25, 4.4, [
+                part("(a)", "Draw the read, compute and write on one timeline.  When does the "
+                            "write complete?", 15, spcBef=0),
+                part("(b)", "The loop only reaches II = 2.  When now?", 15),
+                part("(c)", "Another version first copies all of x into a local array, then "
+                            "computes y into another, then streams y out.  When?", 15),
+                part("(d)", "Which version would you build, and when is the other one "
+                            "necessary?", 15)]),
+            sldnum_ph(ids)]
+
+
+def s_scale_timing_solution(ids):
+    L_, D_, n_ = 10, 4, 1024
+    a_ = 2 * L_ + D_ + n_
+    b_ = 2 * L_ + D_ + 2 * n_
+    c_ = 2 * L_ + 3 * n_ + D_
+    lat = (GRAYFILL, TEXT)
+    rows = [("Read x", [(0, L_, "", *lat), (L_, L_ + n_, "x", TEAL, WHITE)]),
+            ("Compute", [(L_ + 1, L_ + D_ + n_, "a·x + b", VIOLET, WHITE)]),
+            ("Write y", [(L_ + D_, L_ + D_ + n_, "y", TEAL, WHITE),
+                         (L_ + D_ + n_, a_, "", *lat)])]
+    return [title_ph(ids, "Timing y = a·x + b"), pill(ids, "SOLUTION"),
+            *gantt(ids, rows, a_, [0, a_], x=L, y=1.85, w=6.2),
+            textbox(ids, 7.25, 1.8, 5.3, 4.3, [
+                part("(a)", f"All three overlap: the last y reaches the writer at L + D + n, so "
+                            f"it completes at 2L + D + n = !!{a_:,}!!", 14, spcBef=0),
+                part("(b)", f"The full stream holds back the read: one word per 2 cycles, "
+                            f"!!≈ {b_:,}!!", 14),
+                part("(c)", f"Three phases in sequence: (L + n) + (n + D) + (n + L) = "
+                            f"!!{c_:,}!!, about 3×", 14),
+                part("(d)", "Stream when each word is used once, in order.  Buffer when it is "
+                            "reused or read out of order, as the histogram's counts are.  "
+                            "Unit 10 overlaps the buffered phases across jobs", 14)]),
+            label(ids, L, 4.2, 6.2, 0.5, "(a), to scale: read, compute and write overlap.",
+                  sz=12),
             sldnum_ph(ids)]
 
 
@@ -1024,18 +1135,19 @@ PLAN = [
     ("old", 15, None),
     ("new", s_xbar_demo), ("new", s_xbar_area), ("new", s_xbar_cycles),
     ("new", s_xbar_timeline),
-    # section 2: transactional interfaces
-    ("new", s_outline(1)),
-    ("old", 19, None), ("old", 20, None), ("old", 21, None), ("old", 22, None),
+    # section 2: transactional interfaces, on a running example
+    ("new", s_outline(1)), ("new", s_hist_example),
+    ("old", 20, None), ("old", 21, None), ("old", 22, None), ("new", s_hist_format),
     ("new", s_why_transactional), ("new", s_concurrent), ("new", s_hls_task),
-    ("new", s_top_mapped), ("new", s_task_streams), ("new", s_read_adaptor), ("new", s_kernel_use),
-    ("new", s_tags), ("new", s_cmd_practice), ("new", s_cmd_solution),
-    # section 3: AXI4 bursts and timing
+    ("new", s_top_mapped), ("new", s_task_streams), ("new", s_read_adaptor), ("new", s_tags),
+    ("new", s_hist_tasks), ("new", s_hist_ctrl), ("new", s_hist_compute), ("new", s_hist_resp),
+    ("new", s_scale_practice), ("new", s_scale_solution),
+    ("new", s_burst_timing), ("new", s_hist_timing),
+    ("new", s_scale_timing_practice), ("new", s_scale_timing_solution),
+    # section 3: AXI4 under the hood
     ("new", s_outline(2)),
     ("old", 28, None), ("old", 29, None), ("old", 32, None), ("old", 33, None),
     ("old", 34, None),
-    ("new", s_burst_timing), ("new", s_job_timing), ("new", s_job_practice),
-    ("new", s_job_solution),
 ]
 
 
