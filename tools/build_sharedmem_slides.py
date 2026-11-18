@@ -15,7 +15,8 @@ WHAT IT DOES
   * the unit is now Transactional Interfaces to Memory, in five sections
     (plans/unit9_10_memory_pipelining.md): shared memory and interconnects;
     transactions and the data mover; concurrent tasks, on the histogram; AXI4
-    under the hood; memory-mapped queues and credit.  Sections 1-4 are built.
+    under the hood; memory-mapped queues.  All five are built; credit is
+    unit 10's.
     Sections 2 and 3 run on one example, a histogram (demos/histogram, branch
     demo/histogram).  Section 2: the example, the protocol steps (the old
     phase slides), the data mover, the read and write transactions as sequence
@@ -107,7 +108,7 @@ def homework(ids, qtags, y=6.2):
 
 SECTIONS = ["Shared Memory and Interconnects", "Transactions and the Data Mover",
             "Concurrent Tasks: the Histogram", "AXI4 Under the Hood",
-            "Memory-Mapped Queues and Credit"]
+            "Memory-Mapped Queues"]
 
 
 def s_outline(active):
@@ -1542,6 +1543,312 @@ def s_hist_timing(ids):
             sldnum_ph(ids)]
 
 
+# ========================================================== section 5 ======
+# Memory-mapped queues: how the host reaches a free-running kernel.  From
+# Waveflow's docs/guide/interface/axi_mm/slave.md and slave_views.md.  Register
+# banks and BRAM windows exist but are left to those docs; credit is unit 10's.
+
+def _lanes(ids, lanes, y0=1.8, y1=5.25, w=1.35):
+    """Sequence-diagram lifelines: lanes = [(name, x, fill, line)]."""
+    out = []
+    for name, x, fill, line in lanes:
+        out.append(shape(ids, x - w / 2, y0, w, 0.42, fill=fill, line=line, lw=1.25,
+                         prst="roundRect", adj=20000,
+                         paras=[para(name, sz=12, color=TEXT, b=True, align="ctr")]))
+        out.append(arrow(ids, x, y0 + 0.42, x, y1, kit.GRAYLINE, lw=1.0, head=False, dash=True))
+    return out
+
+
+def _say(ids, x1, x2, y, color, text, dash=False, lw=1.75, sz=11):
+    return [arrow(ids, x1, y, x2, y, color, lw=lw, dash=dash),
+            label(ids, min(x1, x2), y - 0.29, abs(x2 - x1), 0.28, text, sz=sz, color=TEXT,
+                  align="ctr")]
+
+
+def s_mm_gap(ids):
+    out = [title_ph(ids, "Who Sends the Command?"),
+           col(ids, L, 5.4, [
+               "So far the **testbench** drove `s_cmd` and `s_done`: AXI-Streams, wired "
+               "straight to the kernel",
+               "In an SoC the job comes from the **CPU**, a master on the interconnect",
+               ("-", "It can only issue reads and writes to addresses"),
+               "So the kernel needs a **slave** port, at an address the CPU can reach",
+               "Its data path does not change: the data movers are still masters"],
+               h=3.8, sz=16, sub=14)]
+    # so far: testbench wired to the kernel
+    out += [kit.heading(ids, 6.6, 1.75, 2.6, "SO FAR"),
+            shape(ids, 6.6, 2.1, 1.4, 0.7, fill=SLATETINT, line=SLATE, lw=1.25, prst="roundRect",
+                  adj=15000, paras=[para("Testbench", sz=13, color=TEXT, b=True, align="ctr")]),
+            shape(ids, 8.75, 2.1, 1.4, 0.7, fill=TINT, line=VIOLET, lw=1.25, prst="roundRect",
+                  adj=15000, paras=[para("Kernel", sz=13, color=TEXT, b=True, align="ctr")]),
+            arrow(ids, 8.0, 2.3, 8.75, 2.3, SLATE, lw=1.5),
+            arrow(ids, 8.75, 2.6, 8.0, 2.6, SLATE, lw=1.5),
+            label(ids, 10.25, 2.25, 2.3, 0.4, "s_cmd, s_done: streams", sz=12, color=SLATE),
+            # in an SoC
+            kit.heading(ids, 6.6, 3.15, 2.6, "IN AN SOC"),
+            shape(ids, 6.6, 3.5, 1.4, 0.7, fill=SLATETINT, line=SLATE, lw=1.25, prst="roundRect",
+                  adj=15000, paras=[para("CPU", sz=13, color=TEXT, b=True, align="ctr")]),
+            shape(ids, 8.35, 3.35, 0.4, 1.9, fill=GRAYFILL, line=SLATE, lw=1.0),
+            label(ids, 7.85, 5.27, 1.4, 0.3, "interconnect", sz=11, align="ctr"),
+            shape(ids, 9.1, 3.5, 1.4, 0.7, fill=TINT, line=VIOLET, lw=1.25, prst="roundRect",
+                  adj=15000, paras=[para("Kernel", sz=13, color=TEXT, b=True, align="ctr")]),
+            shape(ids, 9.1, 4.5, 1.4, 0.6, fill=TEALTINT, line=TEAL, lw=1.25, prst="roundRect",
+                  adj=15000, paras=[para("DDR", sz=13, color=TEXT, b=True, align="ctr")]),
+            arrow(ids, 8.0, 3.85, 8.35, 3.85, SLATE, lw=1.75),
+            arrow(ids, 8.75, 3.85, 9.1, 3.85, AMBER, lw=1.75, dash=True),
+            label(ids, 10.6, 3.65, 1.95, 0.4, "^^?^^  a slave port", sz=13, color=TEXT),
+            arrow(ids, 8.75, 4.8, 9.1, 4.8, TEAL, lw=1.75, head=False),
+            band(ids, "The CPU speaks **reads and writes**; the kernel speaks **streams**.  "
+                      "Something has to translate.", y=5.65, h=0.6, sz=16),
+            sldnum_ph(ids)]
+    return out
+
+
+def s_slave_adaptor(ids):
+    ax, aw = 8.75, 2.0
+    out = [title_ph(ids, "The Slave Adaptor"),
+           col(ids, L, 5.6, [
+               "Why not `s_axilite`, as in unit 4?",
+               ("-", "A free-running kernel has no `ap_start`: it cannot **see** a write happen"),
+               ("-", "And Vitis cannot generate a full AXI4 slave"),
+               "Instead: a **slave adaptor**, hand-written RTL in the top",
+               ("-", "Bus transactions in, **stream messages** out"),
+               "**Kernels stay stream-only**: everything a kernel sees is a stream message",
+               "Each **view** is a 4 KB window of addresses"],
+               h=4.0, sz=16, sub=14),
+           shape(ids, 6.65, 2.4, 1.3, 0.7, fill=SLATETINT, line=SLATE, lw=1.25, prst="roundRect",
+                 adj=15000, paras=[para("CPU", sz=13, color=TEXT, b=True, align="ctr")]),
+           shape(ids, ax, 1.95, aw, 2.6, fill="F7F7F7", line=SLATE, lw=1.25, prst="roundRect",
+                 adj=6000, anchor="t", inset=0.1,
+                 paras=[para("Slave adaptor", sz=13, color=TEXT, b=True, align="ctr")]),
+           shape(ids, ax + 0.2, 2.5, aw - 0.4, 0.55, fill=SLATETINT, line=SLATE, lw=1.0,
+                 prst="roundRect", adj=20000,
+                 paras=[para("queue in", sz=12, color=SLATE, b=True, align="ctr")]),
+           shape(ids, ax + 0.2, 3.25, aw - 0.4, 0.55, fill=SLATETINT, line=SLATE, lw=1.0,
+                 prst="roundRect", adj=20000,
+                 paras=[para("queue out", sz=12, color=SLATE, b=True, align="ctr")]),
+           label(ids, ax + 0.1, 3.95, aw - 0.2, 0.5, "(register bank, BRAM window)", sz=10,
+                 align="ctr"),
+           shape(ids, 11.5, 2.3, 1.05, 1.6, fill=TINT, line=VIOLET, lw=1.25, prst="roundRect",
+                 adj=10000, paras=[para("Kernel", sz=13, color=TEXT, b=True, align="ctr")]),
+           arrow(ids, 7.95, 2.75, ax, 2.75, SLATE, lw=1.75),
+           label(ids, 7.9, 2.42, 0.9, 0.3, "writes", sz=11, align="ctr"),
+           arrow(ids, ax, 3.5, 7.95, 3.5, SLATE, lw=1.75),
+           label(ids, 7.9, 3.53, 0.9, 0.3, "reads", sz=11, align="ctr"),
+           arrow(ids, ax + aw - 0.2, 2.78, 11.5, 2.78, TEAL, lw=1.75),
+           arrow(ids, 11.5, 3.52, ax + aw - 0.2, 3.52, TEAL, lw=1.75),
+           label(ids, 10.55, 2.45, 1.0, 0.3, "stream", sz=11, color=TEAL, align="ctr"),
+           label(ids, 10.55, 3.55, 1.0, 0.3, "stream", sz=11, color=TEAL, align="ctr"),
+           card(ids, L, 5.35, W, 0.85, [para(
+               "Waveflow also provides a **register bank** (configuration and status) and a "
+               "**BRAM window** (memory the host reads and writes by address).  We use only the "
+               "queues; the others are in Waveflow's docs: Interfaces › AXI-MM › Slave side.",
+               sz=14, color=TEXT)], anchor="ctr"),
+           sldnum_ph(ids)]
+    return out
+
+
+def s_queues(ids):
+    rows = [["View", "The host (bus side)", "The kernel"],
+            ["queue in", "writes a **packet** of words: one burst", "reads a stream; TLAST ends "
+                                                                    "each packet"],
+            ["queue out", "reads **exactly n** words", "writes a stream"]]
+    return [title_ph(ids, "Queue In and Queue Out"),
+            table(ids, L, 1.8, [1.7, 4.9, 5.2], rows, rowh=[0.42, 0.55, 0.55], sz=14),
+            textbox(ids, L, 3.55, 6.0, 2.5, [
+                kit.bullet("A packet goes in **whole**, once there is room for all of it", sz=15,
+                           spcBef=0),
+                kit.bullet("A completed write means the queue **took** the words, not that the "
+                           "kernel has read them", sz=15),
+                kit.bullet("Queue out has no packet boundaries on the bus: the host says how "
+                           "many words it wants", sz=15)]),
+            card(ids, 7.0, 3.55, 5.55, 2.35, [
+                para("**Interrupts, not polling**", sz=15, color=TEXT, spcAft=4),
+                kit.bullet("Each queue raises a line when **room** (queue in) or **words** "
+                           "(queue out) reach a threshold the host sets", sz=14, spcBef=0),
+                kit.bullet("The host sleeps on it, then writes or reads: it never reads a count "
+                           "and never stalls the bus", sz=14),
+                kit.bullet("The threshold is set by a write to the window's upper half", sz=14)]),
+            sldnum_ph(ids)]
+
+
+def s_hist_mm(ids):
+    out = [title_ph(ids, "histogram_mm: Only the Top Changes"),
+           col(ids, L, 5.2, [
+               "`s_cmd` becomes a **queue in**, `s_done` a **queue out**",
+               "The five tasks are **the same**: they read and write the same streams",
+               "The data movers still reach DDR as masters",
+               "The kernel is now both: a **slave** for its commands, a **master** for its data "
+               "(section 1)"],
+               h=3.6, sz=16, sub=14)]
+    # CPU and DDR on the interconnect; the adaptor and the kernel
+    out += [shape(ids, 6.4, 2.0, 1.15, 0.6, fill=SLATETINT, line=SLATE, lw=1.25,
+                  prst="roundRect", adj=15000,
+                  paras=[para("CPU", sz=13, color=TEXT, b=True, align="ctr")]),
+            shape(ids, 6.4, 4.2, 1.15, 0.6, fill=TEALTINT, line=TEAL, lw=1.25,
+                  prst="roundRect", adj=15000,
+                  paras=[para("DDR", sz=13, color=TEXT, b=True, align="ctr")]),
+            shape(ids, 7.85, 1.8, 0.35, 3.3, fill=GRAYFILL, line=SLATE, lw=1.0),
+            label(ids, 7.35, 5.12, 1.35, 0.3, "interconnect", sz=11, align="ctr"),
+            arrow(ids, 7.55, 2.3, 7.85, 2.3, SLATE, lw=1.5, head=False),
+            arrow(ids, 7.55, 4.5, 7.85, 4.5, TEAL, lw=1.5, head=False),
+            shape(ids, 8.5, 1.8, 1.45, 1.6, fill="F7F7F7", line=SLATE, lw=1.25, prst="roundRect",
+                  adj=8000, anchor="t", inset=0.08,
+                  paras=[para("slave adaptor", sz=11, color=TEXT, b=True, align="ctr")]),
+            shape(ids, 8.62, 2.2, 1.21, 0.45, fill=SLATETINT, line=SLATE, lw=1.0,
+                  prst="roundRect", adj=20000,
+                  paras=[para("queue in", sz=11, color=SLATE, b=True, align="ctr")]),
+            shape(ids, 8.62, 2.8, 1.21, 0.45, fill=SLATETINT, line=SLATE, lw=1.0,
+                  prst="roundRect", adj=20000,
+                  paras=[para("queue out", sz=11, color=SLATE, b=True, align="ctr")]),
+            arrow(ids, 8.2, 2.6, 8.5, 2.6, SLATE, lw=1.5, head=False),
+            shape(ids, 10.35, 1.8, 2.2, 3.3, fill=TINT, line=VIOLET, lw=1.25, prst="roundRect",
+                  adj=6000, anchor="t", inset=0.1,
+                  paras=[para("histogram kernel", sz=12, color=TEXT, b=True, align="ctr"),
+                         para("the same five tasks", sz=10, color=MUTED, align="ctr")])]
+    for k, (name, y) in enumerate((("t_ctrl", 2.4), ("t_comp", 3.1), ("t_resp", 3.8))):
+        out.append(shape(ids, 10.75, y, 1.4, 0.5, fill=WHITE, line=VIOLET, lw=1.0,
+                         prst="roundRect", adj=20000,
+                         paras=[para(name, sz=11, color=VIOLET, b=True, align="ctr")]))
+    out += [arrow(ids, 9.83, 2.42, 10.75, 2.6, TEAL, lw=1.5),
+            label(ids, 9.9, 2.15, 0.8, 0.28, "s_cmd", sz=10, color=TEAL, b=True),
+            arrow(ids, 10.75, 4.05, 9.83, 3.02, TEAL, lw=1.5),
+            label(ids, 9.75, 3.45, 0.8, 0.28, "s_done", sz=10, color=TEAL, b=True),
+            arrow(ids, 10.35, 4.6, 8.2, 4.6, TEAL, lw=1.5),
+            label(ids, 8.4, 4.3, 1.8, 0.28, "m_rd, m_wr (masters)", sz=10, color=TEAL),
+            band(ids, "Same kernel, same tasks: only who sends the command changed.", y=5.55,
+                 h=0.55, sz=16),
+            draft_note(ids, "histogram_mm.cpp is not built yet; its top replaces this sketch."),
+            sldnum_ph(ids)]
+    return out
+
+
+def s_host_job(ids):
+    xs = {"Host": 6.55, "Queues": 8.45, "Kernel": 10.35, "DDR": 12.0}
+    out = [title_ph(ids, "A Job, from the Host's Side"),
+           col(ids, L, 5.0, [
+               "The host writes the samples to DDR",
+               "It **pushes** the 5-word command into queue in: one write",
+               "It **sleeps** on queue out's interrupt",
+               "The kernel runs the job, as in section 3",
+               "The kernel's response lands in queue out: the interrupt fires",
+               "The host **reads** the 2 words, then the counts from DDR"],
+               h=4.2, sz=15, sub=13),
+           *_lanes(ids, [("Host", xs["Host"], SLATETINT, SLATE),
+                         ("Queues", xs["Queues"], "F7F7F7", SLATE),
+                         ("Kernel", xs["Kernel"], TINT, VIOLET),
+                         ("DDR", xs["DDR"], TEALTINT, TEAL)], w=1.25),
+           *_say(ids, xs["Host"], xs["DDR"], 2.65, TEAL, "samples"),
+           *_say(ids, xs["Host"], xs["Queues"], 3.05, SLATE, "command"),
+           *_say(ids, xs["Queues"], xs["Kernel"], 3.35, TEAL, "s_cmd", lw=1.25),
+           *_say(ids, xs["Kernel"], xs["DDR"], 3.75, TEAL, "read, write", lw=1.25),
+           *_say(ids, xs["Kernel"], xs["Queues"], 4.15, TEAL, "s_done", lw=1.25),
+           *_say(ids, xs["Queues"], xs["Host"], 4.5, AMBER, "interrupt", dash=True, lw=1.25),
+           *_say(ids, xs["Queues"], xs["Host"], 4.85, SLATE, "read 2 words"),
+           *_say(ids, xs["DDR"], xs["Host"], 5.2, TEAL, "counts"),
+           band(ids, "Two bus accesses per job reach the kernel: one write in, one read out.",
+                y=5.6, h=0.55, sz=16),
+           sldnum_ph(ids)]
+    return out
+
+
+def s_jobs_queued(ids):
+    out = [title_ph(ids, "Several Jobs in Flight"),
+           col(ids, L, 6.0, [
+               "The host need not wait for one job before sending the next",
+               ("-", "Queue in holds as many **whole commands** as fit"),
+               "The kernel takes the next command as soon as it is free: no idle time "
+               "between jobs",
+               "Responses come back in order, each with its `job_id`",
+               ("-", "The host matches them: the tag idea again, end to end"),
+               "Unit 10: the next job's read can even start **while** this one computes"],
+               h=4.0, sz=16, sub=14)]
+    # a queue with stacked commands
+    qx, qy, cw, ch = 8.2, 1.9, 2.4, 0.42
+    out.append(kit.heading(ids, qx, 1.6, 3.0, "QUEUE IN, FILLING"))
+    for k, (txt, fill, col_) in enumerate((("job 7  (5 words)", TINT, VIOLET),
+                                           ("job 6  (5 words)", TINT, VIOLET),
+                                           ("job 5  (5 words)", TINT, VIOLET),
+                                           ("job 4: being read", VIOLET, WHITE))):
+        out.append(shape(ids, qx, qy + k * (ch + 0.06), cw, ch, fill=fill, line=VIOLET, lw=1.0,
+                         paras=[para(txt, sz=12, color=col_, b=True, align="ctr")]))
+    out += [arrow(ids, qx + cw / 2, qy + 4 * (ch + 0.06) - 0.02, qx + cw / 2, 4.35, VIOLET,
+                  lw=1.75),
+            label(ids, qx, 4.38, cw, 0.3, "to t_ctrl", sz=12, color=TEXT, align="ctr"),
+            arrow(ids, 11.75, 2.11, qx + cw + 0.08, 2.11, SLATE, lw=1.75),
+            label(ids, 10.75, 2.2, 1.8, 0.3, "the host pushes", sz=12, color=TEXT,
+                  align="ctr"),
+            band(ids, "The queue's depth is how many jobs the host can hand over without "
+                      "waiting.", y=5.5, h=0.6, sz=16),
+            sldnum_ph(ids)]
+    return out
+
+
+def s_bus_backpressure(ids):
+    xs = {"Host": 6.8, "Adaptor": 9.2, "Kernel": 11.6}
+    out = [title_ph(ids, "Back-Pressure Does Not Cross a Bus"),
+           col(ids, L, 5.4, [
+               "On a stream, a full receiver holds TREADY low: only the sender waits",
+               "Over a bus, a write into a full queue holds **WREADY** low",
+               ("-", "The adaptor serves one transaction at a time: **every** access to it waits"),
+               ("-", "Including the host's read of queue out, which would let the kernel go on"),
+               "Not a slowdown: a **deadlock**",
+               "Rule: **never write without knowing there is room**.  The host waits on the room "
+               "interrupt"],
+               h=4.1, sz=15, sub=13),
+           *_lanes(ids, [("Host", xs["Host"], SLATETINT, SLATE),
+                         ("Adaptor", xs["Adaptor"], "F7F7F7", SLATE),
+                         ("Kernel", xs["Kernel"], TINT, VIOLET)], y1=5.0, w=1.3),
+           *_say(ids, xs["Host"], xs["Adaptor"], 2.7, SLATE, "write command"),
+           label(ids, xs["Adaptor"] - 0.1, 2.85, 2.6, 0.3, "^^queue in full: WREADY low^^",
+                 sz=11),
+           *_say(ids, xs["Kernel"], xs["Adaptor"], 3.6, TEAL, "response: queue out full",
+                 lw=1.25),
+           label(ids, xs["Adaptor"] + 0.05, 3.7, 2.4, 0.3, "kernel blocks", sz=11),
+           *_say(ids, xs["Host"], xs["Adaptor"], 4.4, SLATE, "read responses", dash=True),
+           label(ids, xs["Host"] - 0.3, 4.48, 2.7, 0.3, "^^waits behind the write^^", sz=11,
+                 align="ctr"),
+           card(ids, L, 5.35, W, 0.85, fill=kit.AMBERTINT, paras=[para(
+               "A **kernel** writing another kernel's queue over the bus needs the general form "
+               "of the rule: **credit**.  Unit 10, with pipelines of kernels.", sz=14,
+               color=TEXT)], anchor="ctr"),
+           sldnum_ph(ids)]
+    return out
+
+
+def s_queue_practice(ids):
+    return [title_ph(ids, "Queuing Jobs"), pill(ids, "PRACTICE"),
+            textbox(ids, L, 1.8, W, 4.4, [
+                para("`histogram_mm`'s queue in holds 512 words and its queue out 128.  A "
+                     "command is 5 words, a response 2; a packet goes in only whole.  The "
+                     "interconnect is a crossbar.", sz=16, color=TEXT, spcAft=8),
+                part("(a)", "How many commands can be waiting in queue in?", 16),
+                part("(b)", "The host pushes 300 commands as fast as it can, never checking an "
+                            "interrupt, and only then reads the 300 responses.  What happens?  "
+                            "At which command?", 16),
+                part("(c)", "Change the host so it cannot happen.  Name two ways.", 16)]),
+            sldnum_ph(ids)]
+
+
+def s_queue_solution(ids):
+    return [title_ph(ids, "Queuing Jobs"), pill(ids, "SOLUTION"),
+            textbox(ids, L, 1.8, 7.0, 4.4, [
+                part("(a)", "512 / 5: !!102 commands!! (510 words)", 15, spcBef=0),
+                part("(b)", "Queue out fills after **64** responses, and the kernel blocks on "
+                            "the 65th.  It has taken about 65 commands (a few more if `t_ctrl` "
+                            "runs ahead); 102 more wait in queue in.  The host's write of command "
+                            "!!≈ 168!! stalls the bus, so it never reaches its reads: a "
+                            "**deadlock**", 15),
+                part("(c)", "Wait on queue in's **room** interrupt before each push; and read "
+                            "responses as they come (or keep at most 64 jobs outstanding, what "
+                            "queue out can hold)", 15)]),
+            errcard(ids, 8.05, 1.8, 4.5, 2.7, "Common errors",
+                    ["Thinking the stall only slows the host: the host is the one that would "
+                     "drain queue out.",
+                     "Forgetting queue out: queue in alone would only make the host wait."]),
+            sldnum_ph(ids)]
+
+
 # ============================================================== passes ====
 MIGRATED_MARKER = "Bus or Crossbar?"   # a slide only this script makes
 
@@ -1592,6 +1899,10 @@ PLAN = [
     ("new", s_outline(3)),
     ("old", 28, None), ("old", 29, None), ("old", 32, None), ("old", 33, None),
     ("old", 34, None),
+    # section 5: memory-mapped queues
+    ("new", s_outline(4)), ("new", s_mm_gap), ("new", s_slave_adaptor), ("new", s_queues),
+    ("new", s_hist_mm), ("new", s_host_job), ("new", s_jobs_queued),
+    ("new", s_bus_backpressure), ("new", s_queue_practice), ("new", s_queue_solution),
 ]
 
 
