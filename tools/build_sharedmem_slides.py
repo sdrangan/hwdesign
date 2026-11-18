@@ -12,7 +12,7 @@ way to rebuild it, and it refuses to run on its own output.
 
 WHAT IT DOES
 ------------
-  * the unit is now Transactional Interfaces to Memory, in five sections
+  * the unit is now Kernels and Shared Memory, in five sections
     (plans/unit9_10_memory_pipelining.md): shared memory and interconnects;
     transactions and the data mover; concurrent tasks, on the histogram; AXI4
     under the hood; memory-mapped queues.  All five are built; credit is
@@ -78,7 +78,7 @@ ROOT = Path(__file__).resolve().parent.parent
 UNIT = "Unit 9"
 OLD_UNIT = "Unit 8 "
 OLD_TITLE = "Shared Memory Transactions"
-NEW_TITLE = "Transactional Interfaces to Memory"
+NEW_TITLE = "Kernels and Shared Memory"
 
 
 def _parse_args():
