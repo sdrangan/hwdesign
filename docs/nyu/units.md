@@ -10,7 +10,7 @@ The units for Fall 2026, in the order they are taught. Each unit has a lecture,
 one or more demos you can run yourself, and problems on the
 [AI Grader portal](../ai_tools/autograder.md), where you can submit them for
 feedback. Most units also have a [lab](../labs/), built and graded on your own
-machine and submitted to Gradescope. Units 9 and 10 are still being revised.
+machine and submitted to Gradescope. Units 10 and 11 are still being revised.
 
 * Course Introduction
   * Lecture:  [[PDF]](https://github.com/sdrangan/hwdesign/tree/main/units/unit00_course_intro/course_intro.pdf) [[pptx]](https://github.com/sdrangan/hwdesign/tree/main/units/unit00_course_intro/course_intro.pptx)
@@ -53,10 +53,17 @@ machine and submitted to Gradescope. Units 9 and 10 are still being revised.
   * Demo:  [FIR: nested loops](../demos/fir/)
   * In-class exercise:  [Unrolling a dot product](../demos/loopopt/inclass_unroll.md)
   * Lab:  [Stereo depth](../labs/stereo/)
-* Unit 9:  Load-Compute-Store and Line Buffers (in preparation)
-  * Overlapping the load, compute and store phases that the stereo lab runs one after the other.
-    It replaces last year's lecture on shared memory:
-    [[PDF]](https://github.com/sdrangan/hwdesign/tree/main/units/unit09_sharedmem/sharedmem.pdf) [[pptx]](https://github.com/sdrangan/hwdesign/tree/main/units/unit09_sharedmem/sharedmem.pptx)
-* Unit 10:  Arrays and Matrix Multiplication (from Spring 2026, to be revised)
+* Unit 9:  Transactional Interfaces to Memory
+  * Lecture:  [[PDF]](https://github.com/sdrangan/hwdesign/tree/main/units/unit09_sharedmem/sharedmem.pdf) [[pptx]](https://github.com/sdrangan/hwdesign/tree/main/units/unit09_sharedmem/sharedmem.pptx)
+  * Shared memory and interconnects; reaching memory through a data mover, with commands and
+    completions; free-running kernels built from `hls::task`s; AXI4 under the hood; and
+    memory-mapped queues, so a host can send a kernel its jobs
+  * Demo:  [Crossbar or shared bus](../demos/xbar/), area and throughput of AMD's interconnect
+  * Demo:  [Histogram](../demos/histogram/), a free-running kernel on Waveflow's data movers,
+    in a stream version and a memory-mapped version
+* Unit 10:  Task-Level Pipelining and Load-Compute-Store (in preparation)
+  * Overlapping the load, compute and store phases that the stereo lab runs one after the
+    other, with free-running tasks and the data movers of unit 9
+* Unit 11:  Systolic Arrays (from Spring 2026, to be revised)
   * Lecture:  [[PDF]](https://github.com/sdrangan/hwdesign/tree/main/units/unit10_arrays/array.pdf) [[pptx]](https://github.com/sdrangan/hwdesign/tree/main/units/unit10_arrays/array.pptx)
 * [Design project](../projects/)
