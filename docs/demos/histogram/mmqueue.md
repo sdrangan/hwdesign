@@ -82,26 +82,26 @@ With every command queued at once, in absolute clock cycles (100 MHz):
 
 | Job | Host writes the command | Kernel takes it (last word) | Kernel sends the response | Host has read it |
 | --- | --- | --- | --- | --- |
-| 1 (n = 256) | 10 to 17 | 17 | 409 | 415 |
-| 2 (n = 1024) | 19 to 26 | 413 | 1621 | 1627 |
-| 3 (n = 700) | 28 to 35 | 1625 | 2489 | 2495 |
-| 4 (refused) | 37 to 44 | 2493 | 2497 | 2503 |
-| 5 (n = 1024) | 46 to 53 | 2501 | 3710 | 3716 |
+| 1 (n = 256) | 10 to 17 | 17 | 376 | 382 |
+| 2 (n = 1024) | 19 to 26 | 380 | 1555 | 1561 |
+| 3 (n = 700) | 28 to 35 | 1559 | 2390 | 2396 |
+| 4 (refused) | 37 to 44 | 2394 | 2398 | 2404 |
+| 5 (n = 1024) | 46 to 53 | 2402 | 3578 | 3584 |
 
 - **All five commands are in by cycle 53.** Each is one 6-beat burst (the length word, then the
   5 command words), 7 cycles with its write response. Then the host has nothing to do but wait
   for responses.
 - **The commands wait in the queue, not in the kernel.** The kernel takes a command only when
-  its compute task has finished the job before: job 2's command is taken at 413, 4 cycles after
-  job 1's response; job 5's at 2501. `qcmd` holds 64 words, so it takes all five 5-word
+  its compute task has finished the job before: job 2's command is taken at 380, 4 cycles after
+  job 1's response; job 5's at 2402. `qcmd` holds 64 words, so it takes all five 5-word
   commands at once.
 - **The kernel runs exactly as `hist_simple` does.** Its phases match the stream testbench's
-  cycle for cycle, 11 cycles later: L = 23, last B 374 and response 392 after the command.
+  cycle for cycle, 11 cycles later: L = 12, last B 352 and response 359 after the command.
 - **The host has a response 6 cycles after the kernel sends it**: `irq_resp` rises, then a 2-beat
   read.
 - **Nothing is polled.** The host writes each threshold once, at cycles 3 and 6, and otherwise
   only moves commands and responses.
 
 With each job alone, a job costs the host 7 cycles to send and 6 to collect, on top of the
-kernel's own time. For `n` = 256: 405 cycles from the start of the command's write to the end
-of the response read (cycles 10 to 415), against 392 from command to response in `hist_simple`.
+kernel's own time. For `n` = 256: 372 cycles from the start of the command's write to the end
+of the response read (cycles 10 to 382), against 359 from command to response in `hist_simple`.

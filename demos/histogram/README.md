@@ -98,16 +98,16 @@ response per job, with the right status: in order for `simple` and `pipeline`, m
 
 | n | AR | first sample (L) | last sample | MWCmd issued | AW | last count | last B | MemComplete read | response |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 256 | 22 | 23 | 293 | 302 | 339 | 349 | 374 | 390 | 392 |
-| 1024 | 22 | 23 | 1109 | 1118 | 1155 | 1165 | 1190 | 1206 | 1208 |
-| 700 | 22 | 23 | 765 | 774 | 811 | 821 | 846 | 862 | 864 |
+| 256 | 11 | 12 | 282 | 291 | 317 | 327 | 352 | 357 | 359 |
+| 1024 | 11 | 12 | 1098 | 1107 | 1133 | 1143 | 1168 | 1173 | 1175 |
+| 700 | 11 | 12 | 754 | 763 | 789 | 799 | 824 | 829 | 831 |
 | 70000 (refused) | - | - | - | - | - | - | - | - | 4 |
 
 | | `hist_simple` | `hist_pipeline` |
 | --- | --- | --- |
-| back to back, last response | cycle 3699 | cycle 3369 |
-| back to back, first command word to last response word | 3698 | 3368 |
-| alone, each job's first command word to last response word, added up | 3702 | 3612 |
+| back to back, last response | cycle 3567 | cycle 3369 |
+| back to back, first command word to last response word | 3566 | 3368 |
+| alone, each job's first command word to last response word, added up | 3570 | 3612 |
 | estimated Fmax | 137 MHz | 111 MHz |
 
 Every data loop (`SAMPLES`, `COUNTS`, the movers' `A2S`, `S2A`) runs at II=1 in both.

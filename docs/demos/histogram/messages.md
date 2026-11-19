@@ -173,14 +173,14 @@ Data words that are not a message, like the samples and the counts, go through
 `streamutils::read_boundary_word` / `write_boundary_word`, which hand the `last` bit back or
 take it as an argument.
 
-**Arrays** are for putting a message inside another message's field, which is what the next
-section needs.
+**Arrays** are for packing a message into a buffer of words: a block of memory, say, or an
+array field of another message.
 
-## Two ways to carry information with a transfer
+## Carrying information with a transfer
 
 A task that hands work to a data mover usually needs something to come out the other side:
-the next task has to know which job the data belongs to, or what to do with it. There are two
-ways to send it along, and they answer different questions.
+the next task has to know which job the data belongs to, or what to do with it. The data
+movers have one way to send it along: a header in front of the data.
 
 ### A framed header: describes the job
 
@@ -204,48 +204,21 @@ The write mover holds its header across the write and sends it on only after the
 acknowledged the last word. So the header that comes out of the write mover also says *this
 job is done*.
 
-### An `xfer_msg` tag: matches the completion to its job
+### The plain movers carry nothing
 
 Waveflow's other pair of movers, `mem_r_stream_task` and `mem_w_stream_done_task` (the ones
-[`hist_simple`](simple.md) uses, with no tag: `xfer_len = 0`), take their command on its own stream, `MRCmd` / `MWCmd`,
-and carry a **tag**: up to eight 32-bit words, `xfer_msg`, which the write mover hands back,
-untouched, in its `MemComplete` once the write is done. The tag does not travel with the data.
-It comes back with the **completion**.
+[`hist_simple`](simple.md) uses), take their command on its own stream and carry nothing
+but the transfer: `MRCmd` and `MWCmd` are `addr` and `len`, 2 words, and the write mover's
+`MemComplete` is just `len`, 1 word. A completion says *a write is done*, not *which* one.
 
-Use a tag when **nothing downstream needs to know about the job except whoever waits for it to
-finish**: a task that issues a write and later has to match each completion to the write that
-caused it. If the task that receives the completion only has to say "job 7 is done", a tag is
-enough.
+That is enough when **the task that issued the write is the one waiting for it, and has only
+one write outstanding**: it knows which job the completion belongs to because there is only
+one. `hist_simple` is built that way. Once several jobs are in flight, or the completion goes
+to a different task than the one that asked, frame the descriptor and use the framed movers:
+the descriptor the write mover echoes *is* the completion, and it names its job.
 
-Do not fill a tag by hand. The tag is just an array of words, so the generated `write_array`
-packs any message into it, and `read_array` unpacks it at the other end:
-
-```cpp
-HistResp tag;                                       // what the completion should say
-tag.job_id = cmd.job_id;
-tag.status = HistStatus::OK;
-
-MWCmd wc;
-wc.addr = cmd.cnt_addr;
-wc.len = NBINS;
-static_assert(HistResp::nwords<MEM_DW>() <= 8, "the tag must fit in xfer_msg");
-tag.write_array<MEM_DW>(wc.xfer_msg.data);
-wc.xfer_len = HistResp::nwords<MEM_DW>();
-wc.write_stream<MEM_DW>(wr_cmd);
-
-// ... later, in the task that waits for the write:
-MemComplete done;
-done.read_stream<MEM_DW>(wr_done);
-HistResp resp;
-resp.read_array<MEM_DW>(done.xfer_msg.data);       // the same job_id and status
-```
-
-The elements of `xfer_msg` are 32 bits, so this form works with `MEM_DW` = 32. Check that the
-tag fits, with `nwords`, at compile time.
-
-Both approaches cost words. Every `MRCmd`, `MWCmd` and `MemComplete` carries all eight tag words
-whether they are used or not: 11, 11 and 10 words. The framed commands are 3 words, and the
-header is exactly as long as the descriptor.
+The cost in words: the plain commands are 2 words and the completion 1; the framed commands
+are 3 words, and the header is exactly as long as the descriptor.
 
 ## The pattern: one descriptor per job
 

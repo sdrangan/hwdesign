@@ -138,7 +138,7 @@ class GenIncludeStep(BuildStep):
         inner = BuildDag()
         inner.add(StreamUtilsStep(output_dir=schema.INCLUDE_DIR))
         inner.add(MemStreamStep(output_dir=schema.INCLUDE_DIR))      # the mover task bodies
-        # hist_simple: the plain movers' MRCmd, MWCmd and MemComplete (and the xfer_msg array).
+        # hist_simple: the plain movers' MRCmd, MWCmd and MemComplete.
         for cls in PLAIN_MOVER_SCHEMAS:
             inner.add(DataSchemaStep(cls, word_bw_supported=MEM_WORD_BW,
                                      include_dir=schema.INCLUDE_DIR))

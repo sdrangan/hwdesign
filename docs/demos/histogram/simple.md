@@ -75,7 +75,6 @@ static void hist_compute(hls::stream<word_t>& s_cmd, hls::stream<word_t>& s_done
         MRCmd rc;                               // load: n samples from data_addr
         rc.addr = cmd.data_addr;
         rc.len = cmd.n;
-        rc.xfer_len = 0;                        // no tag (unit 10 uses one)
         rc.write_stream<MEM_DW>(rd_cmd);
 
         count_t counts[NBINS];
@@ -93,7 +92,6 @@ static void hist_compute(hls::stream<word_t>& s_cmd, hls::stream<word_t>& s_done
         MWCmd wc;                               // store: NBINS counts to cnt_addr
         wc.addr = cmd.cnt_addr;
         wc.len = NBINS;
-        wc.xfer_len = 0;
         wc.write_stream<MEM_DW>(wr_cmd);
     COUNTS: for (int b = 0; b < NBINS; b++) {
 #pragma HLS PIPELINE II=1
@@ -122,11 +120,11 @@ If the next sample lands in the same bin, its read must see this write, so a new
 start every cycle only if read, add and write fit in one cycle. With the counts partitioned
 into 32 registers they do: Vitis schedules `SAMPLES` at **II=1** (iteration latency 5).
 
-**The tag is not used.** `MRCmd` and `MWCmd` carry an `xfer_msg` tag, up to eight words that the
-write mover hands back in its `MemComplete`. Here `xfer_len` is 0: the compute task waits for
-each completion before issuing anything else, so it always knows which job a completion
-belongs to. Unit 10, where several jobs are in flight at once, uses the tag (see
-[messages and serialization](messages.md#an-xfer_msg-tag-matches-the-completion-to-its-job)).
+**The completion does not say which job.** `MemComplete` carries only the word count. That is
+enough here: the compute task waits for each completion before issuing anything else, so it
+always knows which job a completion belongs to. Unit 10, where several jobs are in flight at
+once, puts a descriptor in front of the data instead (see
+[messages and serialization](messages.md#carrying-information-with-a-transfer)).
 
 ## The data movers
 
@@ -152,14 +150,14 @@ message is a generated struct, written and read with its generated `write_stream
 | Message | Stream | Words | Fields |
 | --- | --- | --- | --- |
 | `HistCmd` | `s_cmd` | 5 | `job_id`, `data_addr`, `n`, `cnt_addr`, `shift` |
-| `MRCmd` | `rd_cmd` | 11 | `addr`, `len`, `xfer_len`, `xfer_msg[8]` |
-| `MWCmd` | `wr_cmd` | 11 | `addr`, `len`, `xfer_len`, `xfer_msg[8]` |
-| `MemComplete` | `wr_done` | 10 | `len`, `xfer_len`, `xfer_msg[8]` |
+| `MRCmd` | `rd_cmd` | 2 | `addr`, `len` |
+| `MWCmd` | `wr_cmd` | 2 | `addr`, `len` |
+| `MemComplete` | `wr_done` | 1 | `len` |
 | `HistResp` | `s_done` | 2 | `job_id`, `status` (`OK` = 0, `N_TOO_LARGE` = 1) |
 
 `HistCmd` and `HistResp` are declared in `hist_schema.py`; `MRCmd`, `MWCmd` and `MemComplete`
-are Waveflow's. The three mover messages always carry all eight tag words, used or not. How a
-message is declared and generated is on the [messages and serialization](messages.md) page.
+are Waveflow's. How a message is declared and generated is on the
+[messages and serialization](messages.md) page.
 
 ## How it is checked
 
@@ -188,7 +186,7 @@ must be untouched, and there must be exactly five responses, in order, with the 
 A deadlock would show up as a missing response, never as a pass. All three runs pass.
 
 Vitis schedules `SAMPLES`, `COUNTS` and the movers' `A2S` / `S2A` at II=1, and estimates the
-design at **137 MHz** (FF 3319, LUT 4512, BRAM 2, DSP 0), against 111 MHz for `hist_pipeline`,
+design at **137 MHz** (FF 2963, LUT 3721, BRAM 2, DSP 0), against 111 MHz for `hist_pipeline`,
 whose framed movers have the slowest paths.
 
 ## The timing of a job
@@ -198,9 +196,9 @@ numbers are the same back to back and with each job alone:
 
 | `n` | AR | first sample (L) | last sample | MWCmd issued | AW | last count | last B | MemComplete read | response |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 256 | 22 | 23 | 293 | 302 | 339 | 349 | 374 | 390 | 392 |
-| 1024 | 22 | 23 | 1109 | 1118 | 1155 | 1165 | 1190 | 1206 | 1208 |
-| 700 | 22 | 23 | 765 | 774 | 811 | 821 | 846 | 862 | 864 |
+| 256 | 11 | 12 | 282 | 291 | 317 | 327 | 352 | 357 | 359 |
+| 1024 | 11 | 12 | 1098 | 1107 | 1133 | 1143 | 1168 | 1173 | 1175 |
+| 700 | 11 | 12 | 754 | 763 | 789 | 799 | 824 | 829 | 831 |
 | 70000 (refused) | - | - | - | - | - | - | - | - | 4 |
 
 "Last sample" is the last read beat on the bus; "last count" is the compute task's last count
@@ -209,22 +207,23 @@ Reading the `n` = 256 row in full:
 
 | Cycles after the command | What |
 | --- | --- |
-| 1 to 13 | the compute task writes the 11-word `MRCmd` |
-| 22 | the read mover's first read request (`AR`) |
-| 23 to 293 | 256 samples on the bus: 16 bursts of 16, 17 cycles each |
-| 28 to 298 | the compute task bins them, one per cycle, 5 behind the bus |
-| 302 to 314 | the 11-word `MWCmd` |
-| 317 to 349 | the 32 counts on `wr_data` |
-| 339, 373 | the first write request (`AW`), the last write beat (`W`) |
-| 374 | the last write response (`B`): the counts are in memory |
-| 379 to 390 | the 10-word `MemComplete`, after the write mover's fence |
-| 391 to 392 | the 2-word `HistResp` |
+| 1 to 2 | the compute task writes the 2-word `MRCmd` |
+| 11 | the read mover's first read request (`AR`) |
+| 12 to 282 | 256 samples on the bus: 16 bursts of 16, 17 cycles each |
+| 17 to 287 | the compute task bins them, one per cycle, 5 behind the bus |
+| 291 to 292 | the 2-word `MWCmd` |
+| 295 to 327 | the 32 counts on `wr_data` |
+| 317, 351 | the first write request (`AW`), the last write beat (`W`) |
+| 352 | the last write response (`B`): the counts are in memory |
+| 357 | the 1-word `MemComplete`, after the write mover's fence |
+| 358 to 359 | the 2-word `HistResp` |
 
-- **L = 23 cycles** to the first sample, for every size: mostly the 11-word read command.
-- **The write request goes out before the last count** (339 against 349): the write port asks
+- **L = 12 cycles** to the first sample, for every size: the 2-word read command, then the
+  read mover's own startup before its request goes out at 11.
+- **The write request goes out before the last count** (317 against 327): the write port asks
   for a 16-beat burst once it has the first 16 counts.
-- **The response leaves 18 cycles after the counts are in memory**: 5 for the fence, 12 for
-  the completion's 10 words, then the response.
+- **The response leaves 7 cycles after the counts are in memory**: 5 for the fence, the
+  completion's one word, then the 2-word response.
 - A refused job answers in **4 cycles** and never touches memory.
 
 ## No overlap across jobs
@@ -232,16 +231,16 @@ Reading the `n` = 256 row in full:
 ![hist_simple, three jobs back to back: each job's load, compute and store, one after the other](images/timeline_simple.png)
 
 One row per task or channel, one colour per job. Each job runs **load, compute, store, respond**,
-and the next job's command is taken only after that response: job 1 responds at cycle 398 and
-job 2's command is taken at 402, its read request at 424. So while the counts are written and
+and the next job's command is taken only after that response: job 1 responds at cycle 365 and
+job 2's command is taken at 369, its read request at 380. So while the counts are written and
 acknowledged the read port is idle, and while the samples are read the write port is idle.
-Between job 1's last sample and job 2's first, the read port waits 125 cycles.
+Between job 1's last sample and job 2's read request, the read port waits 92 cycles.
 
 | | `hist_simple` | `hist_pipeline` |
 | --- | --- | --- |
-| all five back to back: last response | cycle 3699 | cycle 3369 |
-| back to back: first command word to last response word | 3698 | 3368 |
-| the same jobs alone, each first command word to last response word, added up | 3702 | 3612 |
+| all five back to back: last response | cycle 3567 | cycle 3369 |
+| back to back: first command word to last response word | 3566 | 3368 |
+| the same jobs alone, each first command word to last response word, added up | 3570 | 3612 |
 | saved by running back to back | 4 | 244 |
 
 Back to back, `hist_simple` saves only the 4 cycles the `s_cmd` port's register slice gains by

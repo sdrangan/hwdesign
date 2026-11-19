@@ -43,7 +43,7 @@ student can read top to bottom, so each step can be found in the waveform. Its c
 read port sits idle while the job's counts are written and acknowledged, and the write port
 sits idle while the samples are read. Unit 10 is about removing that idle time
 (load–compute–store), and `hist_pipeline` is the reference for it: the same jobs finish in
-3369 cycles instead of 3699. Unit 10's own example may be a different kernel; `hist_pipeline`
+3369 cycles instead of 3567. Unit 10's own example may be a different kernel; `hist_pipeline`
 is kept building and passing as the contrast.
 
 ## Learning objectives
