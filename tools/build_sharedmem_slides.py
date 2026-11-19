@@ -19,7 +19,8 @@ WHAT IT DOES
     unit 10's.
     Sections 2 and 3 run on one example, a histogram (demos/histogram,
     hist_simple; section 5 uses hist_mmqueue).  Section 2: the example, the protocol steps (the old
-    phase slides), the data mover, the read and write transactions as sequence
+    phase slides), why read, compute and write are split, what a transaction is (one
+    working definition, non-blocking), the data mover, the read and write transactions as sequence
     diagrams, a toy kernel (summem), and practice pairs on maxmem and on
     drawing two reads.  Section 3 (reworked 2026-11-18 onto hist_simple): concurrent
     tasks, hls::task with the histogram's top -- one kernel task between the
@@ -553,17 +554,92 @@ def gantt(ids, rows, tmax, ticks, x=5.9, y=2.0, w=6.65, lab_w=1.2, row_h=0.46, g
     return out
 
 
+def s_why_split(ids):
+    """Why the job's load, compute and store become three modules."""
+    bw, bh, gap, y = 2.2, 0.7, 1.05, 1.8
+    x0 = L + (W - 3 * bw - 2 * gap) / 2
+    out = [title_ph(ids, "Why Split Read, Compute and Write?")]
+    boxes = (("Read", SLATETINT, SLATE), ("Compute", TINT, VIOLET), ("Write", SLATETINT, SLATE))
+    for k, (name, fill, line) in enumerate(boxes):
+        out.append(shape(ids, x0 + k * (bw + gap), y, bw, bh, fill=fill, line=line, lw=1.25,
+                         prst="roundRect", adj=15000,
+                         paras=[para(name, sz=15, color=TEXT, b=True, align="ctr")]))
+    for k, text in enumerate(("samples", "counts")):
+        xa = x0 + k * (bw + gap) + bw
+        out += [arrow(ids, xa, y + bh / 2, xa + gap, y + bh / 2, TEAL, lw=1.75),
+                label(ids, xa, y + bh / 2 - 0.32, gap, 0.3, text, sz=11, align="ctr")]
+    out.append(label(ids, L, y + bh + 0.08, W, 0.3,
+                     "The phases of one job become three modules.  Read and write are "
+                     "**data movers**.", sz=13, color=TEXT, align="ctr"))
+    cw, cy, ch = (W - 0.3) / 2, 3.0, 2.35
+    out += [card(ids, L, cy, cw, ch, [
+                para("**Modularity**  (this unit)", sz=15, color=TEXT, spcAft=2),
+                kit.bullet("Read and write become generic **transactions**: a command, then a "
+                           "response", sz=13),
+                kit.bullet("The same command and response as our kernels, over streams", sz=13),
+                kit.bullet("Independent of how it is signalled: the bus can change, the kernel "
+                           "does not", sz=13),
+                kit.bullet("Correct for **any latency**: only the speed changes", sz=13)]),
+            card(ids, L + cw + 0.3, cy, cw, ch, [
+                para("**Parallelism**  (unit 10)", sz=15, color=TEXT, spcAft=2),
+                kit.bullet("Within a job, the compute already runs **as the data arrives**",
+                           sz=13),
+                kit.bullet("Across jobs, the next job's read could overlap this job's write",
+                           sz=13),
+                kit.bullet("That is unit 10", sz=13)]),
+            band(ids, "Think in **transactions**: a command out, a response back.  Not signals, "
+                      "not cycles.", y=5.55, h=0.6, sz=16),
+            sldnum_ph(ids)]
+    return out
+
+
+def s_what_txn(ids):
+    """One working definition, and a picture of two modules to point at."""
+    ax, bx, by, bw, bh = 7.35, 10.75, 2.1, 1.8, 1.7
+    out = [title_ph(ids, "What Is a Transaction?"),
+           col(ids, L, 6.2, [
+               "A **transaction**: one module sends another a **command** to do a job",
+               "The receiver does the job, and may send back a **response**",
+               ("-", "A result, or just “done”"),
+               "Command and response are messages on **streams**",
+               "**Non-blocking**: sending a command does not wait for the job",
+               ("-", "The receiver starts while the sender carries on"),
+               ("-", "The sender waits only when it needs the response"),
+               "Unlike a function call in software, where the caller waits.  Unit 10 builds "
+               "on this"],
+               h=3.6, sz=16, sub=14)]
+    for x, name, role, fill, line in ((ax, "Module A", "sender", TINT, VIOLET),
+                                      (bx, "Module B", "receiver", SLATETINT, SLATE)):
+        out.append(shape(ids, x, by, bw, bh, fill=fill, line=line, lw=1.25, prst="roundRect",
+                         adj=10000, paras=[para(name, sz=15, color=TEXT, b=True, align="ctr"),
+                                           para(role, sz=12, color=MUTED, align="ctr")]))
+    a2 = ax + bw
+    out += [arrow(ids, a2, by + 0.5, bx, by + 0.5, VIOLET, lw=2.0),
+            label(ids, a2, by + 0.17, bx - a2, 0.3, "command", sz=12, color=TEXT, align="ctr"),
+            arrow(ids, bx, by + 1.2, a2, by + 1.2, SLATE, lw=2.0, dash=True),
+            label(ids, a2, by + 1.25, bx - a2, 0.3, "response (optional)", sz=12, color=TEXT,
+                  align="ctr"),
+            label(ids, ax, by + bh + 0.08, bw, 0.3, "carries on", sz=12, align="ctr"),
+            label(ids, bx, by + bh + 0.08, bw, 0.3, "starts the job", sz=12, align="ctr"),
+            label(ids, ax, 4.45, bx + bw - ax, 0.6,
+                  "Other fields use “transaction” in slightly different senses.  In this "
+                  "class, it means this.", sz=12, align="ctr"),
+            band(ids, "Think of it as: **send a command to a module, and it does something**.",
+                 y=5.55, h=0.6, sz=16),
+            sldnum_ph(ids)]
+    return out
+
+
 def s_why_transactional(ids):
     kx, ax, mx = 6.3, 8.55, 11.0
     out = [title_ph(ids, "A Data Mover for Memory"),
            col(ids, L, 5.3, [
-               "A kernel could drive its `m_axi` port itself",
-               ("-", "Addresses, bursts and waiting all mixed into the compute"),
-               "Instead: an **adaptor** owns the port",
-               ("-", "The kernel sends a **command** on a stream"),
+               "An **adaptor**, or **data mover**, owns the `m_axi` port",
+               ("-", "The kernel sends it a **command** on a stream"),
                ("-", "Gets the **data** on a stream"),
-               ("-", "And a **completion** when the burst is done"),
+               ("-", "And, for a write, a **completion** once the data is in memory"),
                "The kernel sees **only streams**, as in unit 5",
+               "The adaptor turns each transaction into bus signals",
                "Commands from many requesters can be **merged** onto one port"],
                h=4.0, sz=17, sub=15)]
     out.append(shape(ids, kx, 2.0, 1.55, 3.0, fill=TINT, line=VIOLET, lw=1.25, prst="roundRect",
@@ -575,12 +651,10 @@ def s_why_transactional(ids):
     out.append(shape(ids, mx, 2.0, 1.55, 3.0, fill=TEALTINT, line=TEAL, lw=1.25, prst="roundRect",
                      adj=8000, paras=[para("Memory", sz=15, color=TEXT, b=True, align="ctr")]))
     k2, a1, a2, m1 = kx + 1.55, ax, ax + 1.75, mx
-    out += [arrow(ids, k2, 2.25, a1, 2.25, VIOLET, lw=1.5),
-            label(ids, k2, 1.95, a1 - k2, 0.3, "command", sz=11, align="ctr"),
-            arrow(ids, a1, 2.65, k2, 2.65, TEAL, lw=1.5),
-            label(ids, k2, 2.35, a1 - k2, 0.3, "data", sz=11, align="ctr"),
-            arrow(ids, a1, 3.0, k2, 3.0, SLATE, lw=1.5, dash=True),
-            label(ids, k2, 2.7, a1 - k2, 0.3, "done", sz=11, align="ctr"),
+    out += [arrow(ids, k2, 2.4, a1, 2.4, VIOLET, lw=1.5),            # read: no completion,
+            label(ids, k2, 2.1, a1 - k2, 0.3, "command", sz=11, align="ctr"),
+            arrow(ids, a1, 2.85, k2, 2.85, TEAL, lw=1.5),            # the data is the response
+            label(ids, k2, 2.55, a1 - k2, 0.3, "data", sz=11, align="ctr"),
             arrow(ids, k2, 4.0, a1, 4.0, VIOLET, lw=1.5),
             label(ids, k2, 3.7, a1 - k2, 0.3, "command", sz=11, align="ctr"),
             arrow(ids, k2, 4.4, a1, 4.4, TEAL, lw=1.5),
@@ -634,9 +708,9 @@ def _beats(ids, a, b, y, n, color, step=0.11, lw=1.25):
             for k in range(n)]
 
 
-TAG_NOTE = ("Both commands also carry a **tag**, `xfer_len` and `xfer_msg`, echoed back unread.  "
-            "In this unit `xfer_len = 0`.  Unit 10 uses it, when the completion goes to a "
-            "**different task** than the one that asked.")
+CMD_NOTE = ("Each command is just `addr` and `len`: 2 words.  `MemComplete` says a write is done, "
+            "not **which** one: here the kernel waits for each, so it knows.  Unit 10 sends a "
+            "descriptor along with the data instead.")
 
 
 def s_read_txn(ids):
@@ -663,7 +737,7 @@ def s_read_txn(ids):
            arrow(ids, 6.5, 2.65, 6.5, 3.75, AMBER, lw=1.25),
            arrow(ids, 6.5, 3.75, 6.5, 2.65, AMBER, lw=1.25),
            label(ids, 6.15, 3.05, 0.3, 0.3, "L", sz=12, color=AMBER, b=True, align="ctr"),
-           card(ids, L, 5.65, W, 0.6, [para(TAG_NOTE, sz=13, color=TEXT)], anchor="ctr"),
+           card(ids, L, 5.65, W, 0.6, [para(CMD_NOTE, sz=13, color=TEXT)], anchor="ctr"),
            sldnum_ph(ids)]
     return out
 
@@ -689,7 +763,7 @@ def s_write_txn(ids):
            *_beats(ids, "Data mover", "Memory", 3.25, 5, TEAL),
            *_msg(ids, "Memory", "Data mover", 4.15, SLATE, "acknowledge", lw=1.25, dash=True),
            *_msg(ids, "Data mover", "Kernel", 4.6, SLATE, "MemComplete: len", dash=True),
-           card(ids, L, 5.65, W, 0.6, [para(TAG_NOTE, sz=13, color=TEXT)], anchor="ctr"),
+           card(ids, L, 5.65, W, 0.6, [para(CMD_NOTE, sz=13, color=TEXT)], anchor="ctr"),
            sldnum_ph(ids)]
     return out
 
@@ -714,7 +788,6 @@ void summem(hls::stream<word_t>& s_cmd,     // in:  addr, n
     MRCmd rc;                       // 2. ask for the data
     rc.addr = c.addr;               //    a word offset
     rc.len  = c.n;                  //    one element per word
-    rc.xfer_len = 0;                //    no tag (later)
     rc.write_stream<32>(rd_cmd);
 
     word_t sum = 0;                 // 3. add as it arrives
@@ -795,7 +868,7 @@ def s_sum_code(ids):
                 kit.bullet("**Four streams**, no memory port: the data mover owns that", sz=15,
                            spcBef=0),
                 kit.bullet("`MRCmd` is the data mover's read command: where and how many "
-                           "words.  Its tag fields come later", sz=15),
+                           "words.  That is all it holds", sz=15),
                 kit.bullet("`rd_data.read()` **blocks**: the loop runs as fast as the words "
                            "come", sz=15),
                 kit.bullet("`sum +=` is a loop-carried add: one cycle, so **II = 1** (unit 7)",
@@ -839,7 +912,7 @@ void maxmem(hls::stream<word_t>& s_cmd, hls::stream<word_t>& rd_cmd,
     SumCmd c;                         // addr, n  (n >= 1)
     c.read_stream<32>(s_cmd);
     MRCmd rc;
-    rc.addr = c.addr;  rc.len = c.n;  rc.xfer_len = 0;
+    rc.addr = c.addr;  rc.len = c.n;
     rc.write_stream<32>(rd_cmd);
 
     ap_int<32> best = rd_data.read(); // the first word
@@ -890,7 +963,7 @@ word_t sum = 0;
 for (int k = 0; k < 2; k++) {           // two halves
     MRCmd rc;
     rc.addr = c.addr + k * (c.n / 2);
-    rc.len  = c.n / 2;  rc.xfer_len = 0;
+    rc.len  = c.n / 2;
     rc.write_stream<32>(rd_cmd);
     for (int i = 0; i < c.n / 2; i++) {
 #pragma HLS PIPELINE II=1
@@ -1010,7 +1083,7 @@ HIST_MM_PATH = "demos/histogram/mmqueue/hist_mmqueue.v"
 HIST_MM_TB_PATH = "demos/histogram/mmqueue/tb_xsi_hist_mmqueue.cpp"
 # hist_mmqueue under XSI, five commands pushed at once: the cycle by which all
 # are in the queue, and the cycles the kernel takes each.
-MMQ = dict(all_in=53, taken="17, 413, 1625, 2493 and 2501")
+MMQ = dict(all_in=53, taken="17, 380, 1559, 2394 and 2402")
 
 TOP_SRC = """
 void copy_top(hls::stream<word_t>& s_cmd,
@@ -1178,9 +1251,7 @@ void mem_r_stream_task(
 def s_read_adaptor(ids):
     rows = [["Field", "Meaning"],
             ["`addr`", "Where to start: a **word offset** in the buffer, not a byte address"],
-            ["`len`", "How many words"],
-            ["`xfer_len`", "How many words of the tag are used"],
-            ["`xfer_msg`", "The **tag**: up to 8 words, echoed back on the completion"]]
+            ["`len`", "How many words"]]
     return [title_ph(ids, "The Read Adaptor"),
             kit.heading(ids, L, 1.75, 5.6, "THE COMMAND, MRCmd"),
             table(ids, L, 2.1, [1.4, 4.3], rows, rowh=0.5, sz=14),
@@ -1196,7 +1267,7 @@ def s_read_adaptor(ids):
             lo.code(ids, 6.75, 2.1, 5.8, ADAPTOR_SRC, sz=11),
             label(ids, 6.75, 4.7, 5.8, 0.7,
                   "Waveflow's `mem_r_stream_task.h`.  The `_done` variant then writes a "
-                  "`MemComplete`: the word count and the tag.", sz=12),
+                  "`MemComplete`: just the word count.", sz=12),
             sldnum_ph(ids)]
 
 
@@ -1310,7 +1381,7 @@ def s_hist_format(ids):
 
 # hist_simple: one kernel task between Waveflow's two adaptors.  The top and the
 # kernel are demos/histogram/simple/hist_simple.cpp, verbatim but for wrapped
-# lines (ebff8b0 on demo/hist-simple).  The numbers below are its XSI run.
+# lines (no xfer_len since Waveflow #315).  The numbers below are its XSI run.
 DRAFT = False
 
 HIST_TOP = """
@@ -1355,7 +1426,6 @@ static void hist_compute(
         MRCmd rc;                         // load: n samples from data_addr
         rc.addr = cmd.data_addr;
         rc.len = cmd.n;
-        rc.xfer_len = 0;                  // no tag (unit 10 uses one)
         rc.write_stream<MEM_DW>(rd_cmd);
 
         count_t counts[NBINS];
@@ -1375,7 +1445,6 @@ HIST_KERNEL_B = """
         MWCmd wc;                         // store: NBINS counts to cnt_addr
         wc.addr = cmd.cnt_addr;
         wc.len = NBINS;
-        wc.xfer_len = 0;
         wc.write_stream<MEM_DW>(wr_cmd);
     COUNTS: for (int b = 0; b < NBINS; b++) {
 #pragma HLS PIPELINE II=1
@@ -1405,8 +1474,7 @@ def s_hist_kernel_load(ids):
                 kit.bullet("**One task runs the whole job**, step by step, like `summem`", sz=14,
                            spcBef=0),
                 kit.bullet("It reads the command and decides the response's status at once", sz=14),
-                kit.bullet("One `MRCmd`: where the samples are and how many.  `xfer_len = 0`: no "
-                           "tag", sz=14),
+                kit.bullet("One `MRCmd`: where the samples are and how many, 2 words", sz=14),
                 kit.bullet("A refused job (n > 65,535) sends no command at all, but still "
                            "responds", sz=14),
                 kit.bullet("The 32 counts are **registers** (`ARRAY_PARTITION complete`), "
@@ -1434,19 +1502,20 @@ def s_hist_kernel_store(ids):
 
 
 # Measured: hist_simple under XSI, one job alone, n = 256, cycles from the
-# command's last word (demos/histogram, ebff8b0).  rc: MRCmd written (1-13);
+# command's last word (demos/histogram, rebuilt on Waveflow #315: 2-word commands,
+# 1-word MemComplete).  rc: MRCmd written (1-2);
 # ar: read request; first/last: first and last sample; bin1: last sample
 # binned; wc0/wc1: MWCmd written; cnt0/cnt1: first and last count leaves the
 # kernel; aw: write request; wlast: last W beat; b: last B; done0/done:
 # MemComplete (after a 5-cycle fence); resp: response written.
-HM = dict(n=256, rc=13, ar=22, first=23, last=293, bin0=28, bin1=298, wc0=302, wc1=314,
-          cnt0=317, cnt1=349, aw=339, wlast=373, b=374, done0=379, done=390, resp=392,
-          period=396)                            # the next job's command, back to back
-HM_N = {256: 392, 700: 864, 1024: 1208}          # one job alone, response cycle
-HM_FIXED = 97                                    # job ≈ L + n·17/16 + 97, for all three
+HM = dict(n=256, rc=2, ar=11, first=12, last=282, bin0=17, bin1=287, wc0=291, wc1=292,
+          cnt0=295, cnt1=327, aw=317, wlast=351, b=352, done0=357, done=357, resp=359,
+          period=363)                            # the next job's command, back to back
+HM_N = {256: 359, 700: 831, 1024: 1175}          # one job alone, response cycle
+HM_FIXED = 75                                    # job ≈ L + n·17/16 + 75, for all three
 # Five jobs (n = 256, 1024, 700, refused, 1024), first command word to last
 # response word: back to back, and the sum of the same jobs run alone.
-B2B = dict(jobs=5, total=3698, isolated=3702)
+B2B = dict(jobs=5, total=3566, isolated=3570)
 HIST_MEASURED = ("Measured: demos/histogram, hist_simple under XSI, 100 MHz; cycles from the "
                  "command's last word.  The testbench memory answers in a cycle.")
 
@@ -1504,7 +1573,7 @@ def s_hist_timing(ids):
             col(ids, L, 4.9, [
                 f"The read: **L = {m['first']}**, then a sample a cycle (plus one per "
                 "16-word burst)",
-                ("-", f"{m['rc']} of those cycles are the 11-word `MRCmd`.  To DDR, add tens "
+                ("-", f"{m['rc']} of those cycles are the 2-word `MRCmd`.  To DDR, add tens "
                       "more"),
                 "The binning hides **under the read**",
                 f"After the last sample: **{tail_cnt}** cycles to send the `MWCmd` and the "
@@ -1563,10 +1632,10 @@ def s_hist_measured(ids):
                            "task or channel, one colour per job", sz=14, spcBef=0),
                 kit.bullet("Top: `t_rd` is **idle between jobs**, while `t_comp` sends the counts "
                            "and waits (hatched)", sz=14),
-                kit.bullet("Zoom: job 1's last B at 380, its `MemComplete` read at 396, its "
-                           "response at 398", sz=14),
-                kit.bullet("Only then is job 2's command taken (402), and its read starts at "
-                           "**424**", sz=14)]),
+                kit.bullet("Zoom: job 1's last B at 358, its `MemComplete` read at 363, its "
+                           "response at 365", sz=14),
+                kit.bullet("Only then is job 2's command taken (369), and its read starts at "
+                           "**380**", sz=14)]),
             label(ids, L, 6.1, W, 0.32, "demos/histogram: python hist_build.py --design simple.  "
                   "Cycles from the end of reset.", sz=11),
             sldnum_ph(ids)]
@@ -2016,6 +2085,7 @@ PLAN = [
     # section 2: transactions and the data mover
     ("new", s_outline(1)), ("new", s_hist_example),
     ("old", 20, None), ("old", 21, None), ("old", 22, None), ("new", s_hist_format),
+    ("new", s_why_split), ("new", s_what_txn),
     ("new", s_why_transactional), ("new", s_read_txn), ("new", s_write_txn),
     ("new", s_sum_diagram), ("new", s_sum_code), ("new", s_sum_timeline),
     ("new", s_max_practice), ("new", s_max_solution),

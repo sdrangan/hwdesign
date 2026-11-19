@@ -27,7 +27,6 @@ static void hist_compute(hls::stream<word_t>& s_cmd, hls::stream<word_t>& s_done
         MRCmd rc;                               // load: n samples from data_addr
         rc.addr = cmd.data_addr;
         rc.len = cmd.n;
-        rc.xfer_len = 0;                        // no tag (unit 10 uses one)
         rc.write_stream<MEM_DW>(rd_cmd);
 
         count_t counts[NBINS];
@@ -45,7 +44,6 @@ static void hist_compute(hls::stream<word_t>& s_cmd, hls::stream<word_t>& s_done
         MWCmd wc;                               // store: NBINS counts to cnt_addr
         wc.addr = cmd.cnt_addr;
         wc.len = NBINS;
-        wc.xfer_len = 0;
         wc.write_stream<MEM_DW>(wr_cmd);
     COUNTS: for (int b = 0; b < NBINS; b++) {
 #pragma HLS PIPELINE II=1

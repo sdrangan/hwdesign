@@ -534,9 +534,9 @@ def measure(vcd_path: Path, top: str, jobs, nbins: int, cmd_words: int, resp_wor
     if probes == "simple":
         from waveflow.hw.mem_stream import MemComplete, MRCmd, MWCmd
         rows = job_table_simple(trace, jobs, nbins, cmd_words, resp_words,
-                                _nwords(MRCmd, addr=0, len=0, xfer_len=0),
-                                _nwords(MWCmd, addr=0, len=0, xfer_len=0),
-                                _nwords(MemComplete, len=0, xfer_len=0))
+                                _nwords(MRCmd, addr=0, len=0),
+                                _nwords(MWCmd, addr=0, len=0),
+                                _nwords(MemComplete, len=0))
         absolute, relative = format_table_simple(rows), format_relative_simple(rows)
     else:
         rows = job_table(trace, jobs, nbins, cmd_words, resp_words, hdr_in, hdr_out)

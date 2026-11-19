@@ -119,9 +119,12 @@ Section 3, concurrent tasks on the histogram (reworked 2026-11-18 onto
 the read adaptor, one kernel task, the write adaptor. The kernel runs a whole
 job in order (command, read, bin, write, wait, respond), so there are no tags,
 no job descriptors and no overlap between jobs: unit 9 teaches the transaction
-mechanics, and unit 10 starts from its serial timeline. `xfer_len = 0`
-throughout unit 9; the tag is introduced in unit 10. The five-task version
-(control, compute and response tasks, tags in `xfer_msg`, jobs overlapping) and
+mechanics, and unit 10 starts from its serial timeline. Since Waveflow PR #315
+(2026-11-19) the plain movers carry no tag at all -- `MRCmd`/`MWCmd` are
+`{addr, len}`, `MemComplete` is `{len}` -- and unit 10 correlates by framing a
+descriptor (the in-band protocol), not by `xfer_msg`. The five-task version
+(control, compute and response tasks, tags in `xfer_msg` -- a field that no
+longer exists, so that tag does not build against current Waveflow -- jobs overlapping) and
 its slides are kept at the git tag `unit9-hist-multitask`; the descriptor
 version (framed movers, one `HistDesc` per job) lives on as
 `demos/histogram` `hist_pipeline`, a unit 10 reference. Unit 9's homework
@@ -146,12 +149,13 @@ Notes:
   the cost.
 
 - Open with *why* a transactional interface, before how: the kernel never sees
-  addresses, every request returns a tagged completion, and an arbiter can merge
-  many requesters ("commands in, completions out, correlation by tag" --
-  Waveflow `docs/guide/interface/axi_mm/master.md`).
+  addresses, every write returns a completion, and an arbiter can merge
+  many requesters (Waveflow `docs/guide/interface/axi_mm/master.md`, which
+  since PR #315 leads with the in-band protocol: the reader relays a
+  descriptor ahead of the data and the writer echoes it as the completion).
 - The adaptors are `MemRStream` / `MemWStream`. A kernel talks to one over
-  three streams: `m_cmd` (an `MRCmd`/`MWCmd` per burst: `addr`, `len`,
-  `xfer_len`, `xfer_msg`), the data stream, and the completion stream. The
+  three streams: `m_cmd` (an `MRCmd`/`MWCmd` per burst: `addr`, `len`), the
+  data stream, and the completion stream (`MemComplete`: `len`). The
   completion endpoint is **`m_done`** (renamed from `s_done` in Waveflow
   PR #312; `s_done` remains as a deprecated alias).
 - Addresses are word offsets from a bound base, not bytes.
@@ -300,8 +304,8 @@ Choices to make:
    belongs in the stage-balancing section rather than being avoided. The
    alternative, if the motivation must be airtight, is a two-pass kernel
    (normalise by max |x|) that cannot emit anything before it has read every
-   input. Unit 10 also introduces the tag (`xfer_msg`) and the transfer
-   message.
+   input. Unit 10 also introduces the framed descriptor: the one way a
+   completion names its job since Waveflow dropped `xfer_msg` (PR #315).
 
 ### Risks
 
@@ -324,7 +328,7 @@ Waveflow names are kept. The slides give the industry term alongside:
 | Waveflow | Industry term | Where Waveflow is narrower |
 |---|---|---|
 | `MemRStream` / `MemWStream` + `MRCmd`/`MWCmd` | DMA engine driven by descriptors (e.g. AXI DataMover) | no scatter-gather |
-| `xfer_msg` echoed on `MemComplete` | transaction tag / completion-queue entry | an opaque requester cookie, not an AXI ID |
+| framed descriptor echoed by the write mover | transaction tag / completion-queue entry | travels in-band with the data, not an AXI ID |
 | slave queue, register bank, BRAM window | doorbells, memory-mapped queues, CSRs | |
 | credit streams | credit-based flow control (PCIe, NoCs) | |
 | `stream_of_blocks` ping-pong | ping-pong / double buffering; PIPO in Vitis `DATAFLOW` | |

@@ -10,7 +10,7 @@ has_children: false
 This is the **unit 10** reference design. It has the same ports as [`hist_simple`](simple.md),
 takes the same commands and passes the same checks, but it is built so that consecutive jobs
 overlap: the next job's samples are read while this job's counts are still being computed,
-written and acknowledged. The same five jobs back to back finish at cycle 3369, against 3699
+written and acknowledged. The same five jobs back to back finish at cycle 3369, against 3567
 for `hist_simple`.
 
 To get there, the one compute task of `hist_simple` is split into five tasks in a line, on
@@ -156,9 +156,11 @@ at cycle 3369, against 3587 for the same jobs one at a time (each from its comma
 to its response).
 
 Compare [`hist_simple`](simple.md#no-overlap-across-jobs), which runs one job at a time: there
-the read port waits 125 cycles between jobs, from job 1's last sample to job 2's read request,
+the read port waits 92 cycles between jobs, from job 1's last sample to job 2's read request,
 while job 1's counts are written, acknowledged and answered. The same five jobs finish at cycle
-3699, and running them back to back saves 4 cycles over running them alone, against 244 here.
+3567, and running them back to back saves 4 cycles over running them alone, against 244 here.
+One job alone is no faster here: 362 cycles from command to response for `n` = 256, against
+359 for `hist_simple`. The gain is all in the overlap.
 
 ## The response and the write acknowledgement
 
