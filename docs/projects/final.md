@@ -38,7 +38,7 @@ tables, logs, or committed synthesis reports.
 | Category | Points | What earns credit |
 |---|---|---|
 | **a. IP interface definition** | 4 | Core operations clearly defined (2) · messages and interfaces defined (2) |
-| **b. IP design** | 6 | Architecture described (3) · design efficiency considered (3) |
+| **b. IP design** | 6 | Architecture described (2) · task‑level pipelining, or one task that suffices (2) · efficiency inside each task (2) |
 | **c. Verification and evaluation** | 7 | Functional verification evidence (4) · performance and resource results (3) |
 | **d. Organization and documentation** | 3 | Reproducibility and automation (3) · up to **−1** for a cluttered or incomplete repo |
 
@@ -49,13 +49,24 @@ What each category is looking for:
   interfaces to the rest of the system (AXI4‑Stream, AXI‑Lite, shared memory,
   FIFOs, DMA, register maps), including what information they actually carry.
 - **IP design** — a coherent top‑level architecture with its major blocks and how
-  they connect, plus explicit reasoning about efficiency: pipelining,
-  parallelism, buffering, reuse, memory access. A simple design is fine as long
-  as you show you considered the tradeoffs.
+  they connect; whether the work is split into concurrent tasks so the stages
+  overlap; and explicit reasoning about efficiency inside each task: pipelining,
+  unrolling, partitioning, buffering, memory access. A simple design is fine as
+  long as you show you considered the tradeoffs.
+- **Task‑level pipelining** — if your design processes blocks, split it into
+  load, compute and store tasks (as in Unit 10) connected by streams or
+  stream‑of‑blocks buffers, so the next block loads while the current one is
+  computed. Throughput is then set by the slowest stage, not the sum; show that
+  with a measured period per job if you can. **One task is fine** when it is
+  enough, for example a kernel that consumes its input in order at its target
+  rate with no block buffer, but say why. Splitting earns nothing by itself:
+  tasks that wait for one another are still serial.
 - **Verification and evaluation** — credible evidence of functional correctness
   (simulation results, reference comparisons, testbench output), *and* synthesis
   or implementation numbers (latency, throughput, clock, utilization) interpreted
-  against the goals you set.
+  against the goals you set. Check the **number** of outputs as well as their
+  values: a free‑running design that deadlocks stops early, and its partial
+  output can look correct.
 - **Organization and documentation** — clear instructions plus some real
   automation: scripts, make targets, `.tcl` flows, or notebooks with a documented
   execution path. A README alone earns partial credit.
@@ -86,11 +97,14 @@ strong but does not map neatly onto a rubric line.
   output cost you up to a point if they make the repo hard to inspect. A large
   repo is fine if it is organized and the project files are easy to find.
 - **Iterate before submitting.** You are encouraged to run the grader on your
-  repository — or use other AI tools — and refine the design and documentation in
-  response.
-- **Check your grader settings.** Select a high‑reasoning model (for example
-  `gpt-5.4`) via the gear icon in the preferences dialog, and set the timeout to
-  at least 100 seconds so the grader has time to inspect the repo.
+  repository and refine the design and documentation in response. With the
+  [course MCP](../ai_tools/course_mcp.md) connected, your own AI can give you a
+  practice estimate from the same rubric first; grade it cold, as described in
+  the [initial plan](./planning.md) instructions.
+- **Check your grader settings.** The question is already set to a
+  high‑reasoning model, so leave the model as it is. Set the timeout to at least
+  100 seconds (the gear icon beside the Grade button) so the grader has time to
+  inspect the repo, and make sure the repository is public.
 
 It is completely acceptable if your design deviated from the original plan — that
 is the nature of research and learning. What matters is that the final
