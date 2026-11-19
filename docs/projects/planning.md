@@ -129,17 +129,30 @@ advice does not cost you points, and it usually saves effort.
 
 {: .note }
 > **Practice grading with your own AI.** With the
-> [course MCP](../ai_tools/course_mcp.md) connected, you can ask your assistant
-> to *"grade my initial plan for the Project Outline question, at
-> &lt;link to your plan&gt;"*. It uses the portal's own rubric and grading prompt
-> but runs on your AI subscription, so you can iterate on the plan without using
-> the portal's model. It is an estimate: grade on the portal for credit.
+> [course MCP](../ai_tools/course_mcp.md) connected, your assistant can estimate
+> your grade before you submit, using the portal's own rubric and grading prompt.
+> It runs on your own AI allowance, so you can iterate on the plan as often as you
+> like. It is an estimate: grade on the portal for credit.
 >
-> Your assistant needs web access to open the link (in claude.ai, make sure web
-> search is on). Some assistants summarize a web page instead of reading it whole,
-> which can cost you points the portal would give; if the estimate says a section
-> is missing that is in your plan, ask it to quote the section, or paste the plan
-> into the chat. Pasting costs you only the 2 repository points in the estimate.
+> **Grade it cold.** An assistant that helped you write the plan knows what you
+> meant, and will credit things that are in your chat but not in the file. The
+> portal grader sees only the file. Commit and push, then ask:
+>
+> > *Use a fresh agent that sees only this link and the course MCP to grade my
+> > plan for the Project Outline question: &lt;link to your plan&gt;. Grade only
+> > what the file says.*
+>
+> If your assistant cannot launch a separate agent, open a new chat and ask the
+> same thing there. Then bring the feedback back to the chat where you write the
+> plan.
+>
+> **If it cannot read the link.** Your assistant needs web access (in claude.ai,
+> make sure web search is on). Some assistants are blocked by github.com; give
+> them the raw link instead,
+> `https://raw.githubusercontent.com/<you>/<repo>/main/plans/initial_plan.md`.
+> Some summarize a page instead of reading it whole, which can cost you points the
+> portal would give: if the estimate says something is missing that is in your
+> plan, ask it to quote that section.
 
 ---
 
