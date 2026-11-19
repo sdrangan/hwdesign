@@ -30,6 +30,23 @@ It is set up to help you study: it usually starts with a hint and shows the
 full solution only if you ask. Nothing you do through it is graded or recorded,
 and it never sees your account, your chats or your grades.
 
+## Practice grading
+
+Your assistant can also estimate how an answer would score before you submit
+it. Ask, for example, *"Grade my answer to problem 3 in unit 4 the way the
+autograder would."* It fetches the autograder's own grading prompt and
+rubric, grades your answer itself, and totals the points the way the portal
+does.
+
+- **It is an estimate.** Your assistant is a different model from the portal's
+  grader, so the score can differ. Only an answer graded on the portal counts.
+- **It runs on your own AI.** The grading uses your assistant's usage
+  allowance, not the portal's, and your answer is never sent to the course
+  server.
+- **For a question that reads a link** (such as the project plan), your
+  assistant needs web access to open it. Commit and push first, so it reads
+  what the portal will read.
+
 ## The address
 
 ```

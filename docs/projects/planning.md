@@ -127,6 +127,20 @@ advice does not cost you points, and it usually saves effort.
 > seconds (the gear icon beside the Grade button) and make sure the repository is
 > public. You may submit as many times as you like.
 
+{: .note }
+> **Practice grading with your own AI.** With the
+> [course MCP](../ai_tools/course_mcp.md) connected, you can ask your assistant
+> to *"grade my initial plan for the Project Outline question, at
+> &lt;link to your plan&gt;"*. It uses the portal's own rubric and grading prompt
+> but runs on your AI subscription, so you can iterate on the plan without using
+> the portal's model. It is an estimate: grade on the portal for credit.
+>
+> Your assistant needs web access to open the link (in claude.ai, make sure web
+> search is on). Some assistants summarize a web page instead of reading it whole,
+> which can cost you points the portal would give; if the estimate says a section
+> is missing that is in your plan, ask it to quote the section, or paste the plan
+> into the chat. Pasting costs you only the 2 repository points in the estimate.
+
 ---
 
 ## After the Initial Plan
