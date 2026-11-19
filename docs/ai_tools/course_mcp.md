@@ -43,9 +43,14 @@ does.
 - **It runs on your own AI.** The grading uses your assistant's usage
   allowance, not the portal's, and your answer is never sent to the course
   server.
+- **Grade it cold.** An assistant that helped you write an answer knows what
+  you meant and will credit things that are only in your chat. Ask it to grade
+  with a fresh agent that sees only your answer and the course MCP, or, if it
+  cannot launch one, open a new chat for the grading.
 - **For a question that reads a link** (such as the project plan), your
   assistant needs web access to open it. Commit and push first, so it reads
-  what the portal will read.
+  what the portal will read. If it is blocked by github.com, give it the
+  `raw.githubusercontent.com` link to the file instead.
 
 ## The address
 
