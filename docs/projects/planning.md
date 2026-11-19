@@ -39,7 +39,7 @@ Your repo will become the central artifact of your project — treat it as a pro
 
 Create a file named something like `initial_plan.md` in your repo.  
 This document should contain **three short sections**, written clearly and concisely.
-I will put some [examples](./example_plans/) if you want some ideas.  
+There are [example plans](./example_plans/) if you want to see the level of detail expected.
 
 ### 1. Project Team
 
@@ -122,8 +122,10 @@ one could replace something you were planning to build yourself. Following that
 advice does not cost you points, and it usually saves effort.
 
 {: .note }
-> Before clicking **Grade**, select a high‑reasoning model such as `gpt-5.4` using
-> the gear icon beside the Grade button. You may submit as many times as you like.
+> The question is already set to a high‑reasoning model, so leave the model as it
+> is. Because the grader reads your repository, set the timeout to at least 100
+> seconds (the gear icon beside the Grade button) and make sure the repository is
+> public. You may submit as many times as you like.
 
 ---
 
